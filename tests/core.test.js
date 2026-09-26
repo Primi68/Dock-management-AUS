@@ -14,6 +14,9 @@ test('midnight belongs to preceding business day when enabled',()=>{
   const s=C.defaults();s.times.push('24:00');
   assert.deepEqual(C.suggest(date('2026-09-26T00:05:00'),s,[]),{date:'2026-09-25',time:'24:00'});
 });
+test('a future saved check still advances instead of proposing an older record',()=>{
+  assert.deepEqual(C.suggest(date('2026-09-25T15:35:00'),C.defaults(),[{date:'2026-09-28',time:'07:30'}]),{date:'2026-09-28',time:'09:30'});
+});
 test('missed checks are skipped and duplicate slots advance',()=>{
   assert.equal(C.suggest(date('2026-09-25T13:15:00'),C.defaults(),[{date:'2026-09-25',time:'07:30'}]).time,'13:30');
   assert.equal(C.suggest(date('2026-09-25T09:15:00'),C.defaults(),[{date:'2026-09-25',time:'09:30'}]).time,'11:30');

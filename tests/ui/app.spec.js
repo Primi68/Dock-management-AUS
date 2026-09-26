@@ -1,15 +1,17 @@
 const {test,expect}=require('@playwright/test');
 async function start(page){
   await page.goto('/');await page.getByRole('button',{name:'첫 점검 만들기'}).click();
+  await expect(page.locator('.dock')).toHaveCount(20);
+  await page.getByRole('button',{name:'날짜·점검 시간 수정'}).click();
   await page.locator('#new-date').fill('2026-09-25');await page.locator('#new-time').selectOption('07:30');
-  await page.getByRole('button',{name:'기록 불러오기'}).click();
+  await page.getByRole('button',{name:'시간 적용'}).click();
 }
 async function container(page,value){
   await page.locator('#dock-1 [data-action="container"]').click();await page.locator('#container-value').fill(value);
   await page.locator('#replace-container').click();
 }
 async function next(page,time){
-  await page.getByRole('button',{name:'다음 점검 →',exact:true}).click();await page.locator('#new-date').fill('2026-09-25');await page.locator('#new-time').selectOption(time);await page.getByRole('button',{name:'기록 불러오기'}).click();
+  await page.getByRole('button',{name:'다음 점검 →',exact:true}).click();await expect(page.locator('.dock')).toHaveCount(20);await page.getByRole('button',{name:'날짜·점검 시간 수정'}).click();await page.locator('#new-date').fill('2026-09-25');await page.locator('#new-time').selectOption(time);await page.getByRole('button',{name:'시간 적용'}).click();
 }
 test('complete field workflow, carry-forward, highlight, restart and departure',async({page})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));

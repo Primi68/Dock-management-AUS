@@ -32,8 +32,11 @@
   // 24:00 belongs to the preceding work date, even after midnight.
   function suggest(now, settings, records) {
     const slots=[];
+    const latest=records[records.length-1];
+    const anchor=latest && latest.date>dateKey(now)?new Date(latest.date+'T12:00:00'):now;
+    const latestAt=latest?new Date(latest.date+'T00:00:00').getTime()+minutes(latest.time)*60000:-Infinity;
     for (let offset=-1; offset<=15; offset++) {
-      const day=new Date(now.getFullYear(),now.getMonth(),now.getDate()+offset,12);
+      const day=new Date(anchor.getFullYear(),anchor.getMonth(),anchor.getDate()+offset,12);
       if (!settings.days.includes(day.getDay())) continue;
       for (const time of settings.times) {
         const at=new Date(day.getFullYear(),day.getMonth(),day.getDate(),0,0);
@@ -47,7 +50,7 @@
     let selected=opened.length?opened[opened.length-1]:candidates[0];
     if (!selected) selected=slots.find(s=>s.at>=now.getTime());
     const exists=s=>records.some(r=>r.date===s.date && r.time===s.time);
-    if (selected && exists(selected)) selected=slots.find(s=>s.at>selected.at && !exists(s));
+    if (selected && (exists(selected) || selected.at<=latestAt)) selected=slots.find(s=>s.at>Math.max(selected.at,latestAt) && !exists(s));
     if (!selected) throw new Error('점검 시간표를 확인해 주세요.');
     return {date:selected.date,time:selected.time};
   }

@@ -25,13 +25,23 @@ function download(name,mime,content){
 function copyRecord(){const text=C.text(current());if(native)native.copy(text);else navigator.clipboard.writeText(text).then(()=>toast('점검 기록을 복사했습니다')).catch(()=>download('dock-check.txt','text/plain',text));}
 function openNew(){
   if(state.draft){editing=true;screen='record';onlyChanged=false;render();return;}
-  const slot=C.suggest(new Date(),state.settings,state.records);
-  modal(`<h2>다음 점검</h2><p>최근 Dock 1~20 기록을 그대로 가져옵니다.<br>점검 시간은 실제 입력 시각과 다를 수 있습니다.</p><label>업무 날짜<input id="new-date" type="date" value="${slot.date}"></label><label>점검 시간<select id="new-time">${state.settings.times.map(t=>`<option ${t===slot.time?'selected':''}>${t}</option>`).join('')}</select></label><p id="new-error" class="danger" role="alert"></p><div class="actions"><button data-action="close">취소</button><button class="primary" id="create-check">기록 불러오기 →</button></div>`);
+  try{
+    const slot=C.suggest(new Date(),state.settings,state.records);
+    state.draft=C.newRecord(state,slot.date,slot.time);
+    if(!persist()){state.draft=null;return;}
+    editing=true;onlyChanged=false;screen='record';render();window.scrollTo(0,0);
+  }catch(e){toast(e.message);}
+}
+function editSchedule(){
+  const r=state.draft,times=[...new Set([...state.settings.times,r.time])].sort((a,b)=>C.minutes(a)-C.minutes(b));
+  modal(`<h2>날짜·점검 시간 수정</h2><p>실제 입력 시각이 아닌 예정된 점검 시간을 선택하세요.</p><label>업무 날짜<input id="new-date" type="date" value="${r.date}"></label><label>점검 시간<select id="new-time">${times.map(t=>`<option ${t===r.time?'selected':''}>${t}</option>`).join('')}</select></label><p id="new-error" class="danger" role="alert"></p><div class="actions"><button data-action="close">취소</button><button class="primary" id="create-check">시간 적용</button></div>`);
   $('#create-check').onclick=()=>{
     try{
-      state.draft=C.newRecord(state,$('#new-date').value,$('#new-time').value);
-      if(!persist()){state.draft=null;return;}
-      editing=true;onlyChanged=false;screen='record';closeDialog();render();window.scrollTo(0,0);
+      const date=$('#new-date').value,time=$('#new-time').value;
+      C.newRecord(state,date,time);
+      const old={date:r.date,time:r.time};r.date=date;r.time=time;
+      if(!persist()){Object.assign(r,old);return;}
+      closeDialog();render();
     }catch(e){$('#new-error').textContent=e.message;}
   };
 }
@@ -49,6 +59,7 @@ function render(){
   const latest=state.records[state.records.length-1];
   $('#app').innerHTML=`<section class="intro"><div class="eyebrow">${editing?'FIELD NOTES':'DOCK CHECK'}</div><div class="row between"><h1>${esc(r.time)}${r.time==='24:00'?' 마감':''}</h1><span class="pill">${editing?'작성 중':r.id===latest?.id?'최신 점검':'지난 점검'}</span></div><div class="timeline-label">${esc(r.date)} · ${['일','월','화','수','목','금','토'][new Date(r.date+'T12:00:00').getDay()]}요일</div><div class="summary"><span class="pill">20 Docks</span><span class="pill yellow count" id="change-count">${changed}곳 변경</span></div><p class="smallprint">전체 노랑 = 새 컨테이너 / 반출 · 부분 노랑 = 해당 항목 변경</p>${editing?'<div class="autosave" id="save-status">기기에 임시 저장됨</div>':`<div class="toolbar"><button data-action="filter" class="toggle ${onlyChanged?'active':''}">${onlyChanged?'전체 보기':'변경된 Dock만'}</button><button data-action="copy">전체 복사</button><button data-action="text">텍스트 저장</button></div>`}</section><div id="dock-list">${r.groups.map(g=>groupHtml(r,g)).join('')}</div>${onlyChanged&&!changed?'<div class="notice">이전 점검과 달라진 내용이 없습니다.</div>':''}`;
   $('#bottom').innerHTML=`<div class="footer"><div class="footer-inner">${editing?'<button class="primary" data-action="save">저장 · 점검 보기</button>':`${r.id===latest?.id&&!state.draft?'<button data-action="edit">수정</button>':'<button data-action="latest">최신 점검</button>'}<button class="primary" data-action="next">${state.draft?'작성 중인 점검 이어서 →':'다음 점검 →'}</button>`}</div></div>`;
+  if(editing)$('#save-status').insertAdjacentHTML('beforebegin','<button class="link" data-action="schedule">날짜·점검 시간 수정</button>');
 }
 function groupHtml(r,g){
   const rows=r.rows.filter(row=>row.dock>=g.start&&row.dock<=g.end&&(!onlyChanged||editing||change(r,row).fields.length));
@@ -90,7 +101,7 @@ function saveCheck(){
   selected=r.id;editing=false;onlyChanged=false;render();window.scrollTo(0,0);toast('저장했습니다. 변경된 부분을 보고 엑셀에 반영하세요.');
 }
 function menu(){
-  modal(`<h2>Dock Notes</h2><div class="menu-list"><button data-action="latest">최신 점검${state.draft?' / 작성 중':''}</button><button data-action="history">지난 점검 기록</button><button data-action="settings">점검 시간 · 구역 설정</button><button data-action="backup">전체 기록 백업 (JSON)</button><button data-action="restore">백업 복원</button><button data-action="all-text">모든 기록 텍스트 저장</button><button data-action="close">닫기</button></div><p class="smallprint">v0.1.0 · 오프라인 개인 기록장<br>실제 기록은 GitHub에 전송하지 않습니다.<br>앱 삭제 전에는 전체 백업을 저장해 주세요.</p>`);
+  modal(`<h2>Dock Notes</h2><div class="menu-list"><button data-action="latest">최신 점검${state.draft?' / 작성 중':''}</button><button data-action="history">지난 점검 기록</button><button data-action="settings">점검 시간 · 구역 설정</button><button data-action="backup">전체 기록 백업 (JSON)</button><button data-action="restore">백업 복원</button><button data-action="all-text">모든 기록 텍스트 저장</button><button data-action="close">닫기</button></div><p class="smallprint">v0.1.1 · 오프라인 개인 기록장<br>실제 기록은 GitHub에 전송하지 않습니다.<br>앱 삭제 전에는 전체 백업을 저장해 주세요.</p>`);
 }
 function renderHistory(){
   $('#app').innerHTML=`<div class="eyebrow">HISTORY</div><h1>지난 점검</h1><p class="muted">${state.records.length}개 기록 · 이전 점검과의 변경 표시를 보존합니다.</p><button data-action="latest">← 최신 점검</button>${state.records.slice().reverse().map(r=>`<button class="history-item" data-action="record" data-id="${esc(r.id)}">${esc(r.date)} · ${esc(r.time)}<small>${r.rows.filter(row=>change(r,row).fields.length).length}곳 변경 · 기록 보기</small></button>`).join('')||'<p class="muted">저장한 점검이 없습니다.</p>'}`;
@@ -122,6 +133,7 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('[data-action]');if(!b)return;const action=b.dataset.action,n=Number(b.dataset.dock);
   if(action==='close'){closeDialog();return;}
   if(action==='next'){openNew();return;}
+  if(action==='schedule'){editSchedule();return;}
   if(action==='save'){saveCheck();return;}
   if(action==='container'){editContainer(n);return;}
   if(action==='filter'){onlyChanged=!onlyChanged;render();return;}
