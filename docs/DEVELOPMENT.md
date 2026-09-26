@@ -20,6 +20,8 @@ JDK 17 / Android SDK Platform 35 및 Build Tools 35.0.0 / Gradle 8.11.1 / Node 2
 - assets/app.js 및 style.css: 입력·조회·설정 화면.
 - MainActivity.java: 오프라인 WebView, 원자적 저장, Android 클립보드/파일 선택기.
 - tests: 업무 로직 및 모바일 크기 브라우저 테스트.
-- .github/workflows/android.yml: 테스트, lint, APK 빌드와 버전 태그 기반 미리보기 릴리스.
+- .github/workflows/android.yml: 일반 코드 push는 업무 규칙과 화면 검증만 실행. 최종 버전 태그에서 Android lint·에뮬레이터 검증·APK 빌드 후 미리보기 릴리스.
+
+작업 단위가 완료될 때마다 코드를 commit/push합니다. 설명 문서는 요청된 수정과 최종 검증을 마친 시점에 함께 갱신하고, APK도 최종 버전으로 한 번만 빌드·배포합니다. 중간 코드 push마다 APK를 재배포하지 않습니다.
 
 업데이트에는 versionCode 증가와 백업 스키마 호환성 유지가 필요합니다. 실제 자료를 테스트 fixture로 쓰지 않습니다. 장기 배포 전 서명 키를 안전하게 관리해야 하며 서명 변경 시 백업·복원 절차를 지킵니다. 현재는 개발용 미리보기 서명입니다.
