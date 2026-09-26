@@ -38,12 +38,12 @@ jobs:
       - name: Name APK and checksum
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/Dock-Notes-0.1.1-preview.apk
+          cp app/build/outputs/apk/debug/app-debug.apk dist/Dock-Notes-0.2.0-preview.apk
           cd dist
           sha256sum *.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Dock-Notes-0.1.1-preview
+          name: Dock-Notes-0.2.0-preview
           path: dist/
       - uses: actions/upload-artifact@v4
         if: always()
@@ -89,10 +89,10 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: Dock-Notes-0.1.1-preview
+          name: Dock-Notes-0.2.0-preview
           path: dist
       - name: Publish private preview release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --prerelease --title "Dock Notes $GITHUB_REF_NAME — Android MVP" --notes "개인용 오프라인 Android MVP. 다음 점검 복사, 변경 강조, 기록 보관, 텍스트 내보내기, JSON 백업/복원. Android 8 이상. 미리보기용 debug APK입니다. 실제 운영 데이터는 포함하지 않습니다. 설치 및 제한 사항은 저장소 docs/INSTALL.md를 확인해 주세요."
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --prerelease --title "Dock Notes $GITHUB_REF_NAME — Android MVP" --notes "개인용 오프라인 Android MVP. 가로형 결과 목록, 구간별 보기, 컨테이너 번호 직접 입력, 지난 점검 수정, 잘못 만든 점검 취소/삭제. 설치 전 기존 앱에서 JSON 전체 백업을 저장하세요. Android 8 이상. 미리보기용 debug APK입니다. 실제 운영 데이터는 포함하지 않습니다. 설치 및 제한 사항은 저장소 docs/INSTALL.md를 확인해 주세요."

@@ -39,7 +39,7 @@ public class OfflineSmokeTest {
             String script="(function(){let s=DockCore.initial();let r=DockCore.newRecord(s,'2026-09-25','07:30');r.rows[0].container='DEMO-ANDROID';r.rows[0].status='Full';s.draft=r;return DockNative.save(JSON.stringify(s));})()";
             assertEquals("true",evaluate(scenario,script));
             scenario.recreate();waitForPage(scenario);
-            assertEquals("true",evaluate(scenario,"document.body.innerText.includes('DEMO-ANDROID') && document.querySelectorAll('.dock').length===20"));
+            assertEquals("true",evaluate(scenario,"document.querySelector('#dock-1 [data-field=container]').value==='DEMO-ANDROID' && document.querySelectorAll('.dock').length===20"));
             assertEquals("true",evaluate(scenario,"DockCore.parseBackup(DockNative.load()).draft.rows[0].status==='Full'"));
         }
     }

@@ -7,8 +7,8 @@ async function start(page){
   await page.getByRole('button',{name:'시간 적용'}).click();
 }
 async function container(page,value){
-  await page.locator('#dock-1 [data-action="container"]').click();await page.locator('#container-value').fill(value);
-  await page.locator('#replace-container').click();
+  await page.locator('#dock-1 [data-field="container"]').fill(value);
+  await page.locator('#dock-1 [data-field="container"]').press('Tab');
 }
 async function next(page,time){
   await page.getByRole('button',{name:'다음 점검 →',exact:true}).click();await expect(page.locator('.dock')).toHaveCount(20);await page.getByRole('button',{name:'날짜·점검 시간 수정'}).click();await page.locator('#new-date').fill('2026-09-25');await page.locator('#new-time').selectOption(time);await page.getByRole('button',{name:'시간 적용'}).click();
@@ -32,7 +32,7 @@ test('complete field workflow, carry-forward, highlight, restart and departure',
   await page.screenshot({path:'test-results/03-container-change.png',fullPage:false});
   await next(page,'13:30');await page.locator('#dock-1 [data-field="status"]').selectOption('Ready to drop');await page.locator('#confirm-action').click();
   await expect(page.locator('#dock-1')).toHaveClass(/whole/);await expect(page.locator('#dock-1 [data-field="codes"]')).toBeDisabled();
-  await page.getByRole('button',{name:'저장 · 점검 보기'}).click();await expect(page.locator('#dock-1 .read-main')).toContainText('컨테이너 없음');
+  await page.getByRole('button',{name:'저장 · 점검 보기'}).click();await expect(page.locator('#dock-1 .read-main')).toHaveText('—');
   expect(errors).toEqual([]);
 });
 test('editable settings, header isolation, backups and history',async({page})=>{
@@ -64,6 +64,58 @@ test('late number entry preserves observations and same-container typo correctio
   await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('DEMO-LATE-CODE');
   await expect(page.locator('#dock-1 [data-field="status"]')).toHaveValue('Full');
   await page.getByRole('button',{name:'저장 · 점검 보기'}).click();await next(page,'09:30');
-  await page.locator('#dock-1 [data-action="container"]').click();await page.locator('#container-value').fill('DEMO-NUMBER-CORRECTED');await page.locator('#correct-container').click();
+  await container(page,'DEMO-NUMBER-CORRECTED');await page.locator('#dock-1 [data-action="number-correction"]').click();
   await expect(page.locator('#dock-1')).not.toHaveClass(/whole/);await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('DEMO-LATE-CODE');
+});
+test('ready to drop cancellation preserves data; confirmation clears every field and survives reload',async({page})=>{
+  await start(page);await container(page,'DEMO-A');
+  await page.locator('#dock-1 [data-field="codes"]').fill('DEMO-I');
+  await page.locator('#dock-1 [data-field="contents"]').fill('demo cargo');
+  await page.locator('#dock-1 [data-field="note"]').fill('demo note');
+  await page.locator('#dock-1 [data-field="status"]').selectOption('Full');
+  await page.locator('#dock-1 [data-field="status"]').selectOption('Ready to drop');
+  await page.locator('#dialog [data-action="close"]').click();
+  await expect(page.locator('#dock-1 [data-field="container"]')).toHaveValue('DEMO-A');
+  await expect(page.locator('#dock-1 [data-field="status"]')).toHaveValue('Full');
+  await page.locator('#dock-1 [data-field="status"]').selectOption('Ready to drop');await page.locator('#confirm-action').click();
+  await page.reload();
+  for(const key of ['container','codes','contents','note'])await expect(page.locator('#dock-1 [data-field="'+key+'"]')).toHaveValue('');
+  await expect(page.locator('#dock-1 [data-field="status"]')).toHaveValue('Ready to drop');
+});
+test('accidental future draft can be cancelled and older saved inspections can be corrected safely',async({page})=>{
+  await start(page);await container(page,'DEMO-A');await page.locator('#dock-1 [data-field="status"]').selectOption('Full');
+  await page.getByRole('button',{name:'저장 · 점검 보기'}).click();
+  for(const time of ['09:30','11:30','13:30']){await next(page,time);await page.getByRole('button',{name:'저장 · 점검 보기'}).click();}
+  await next(page,'15:30');
+  await page.locator('#record-switch').selectOption({label:'2026-09-25 · 11:30'});
+  await page.getByRole('button',{name:'수정',exact:true}).click();await page.locator('#confirm-action').click();
+  await page.locator('#dock-1 [data-field="status"]').selectOption('Empty');await page.reload();
+  await expect(page.locator('#dock-1 [data-field="status"]')).toHaveValue('Empty');
+  await page.getByRole('button',{name:'저장 · 점검 보기'}).click();
+  await page.locator('#record-switch').selectOption({label:'2026-09-25 · 13:30'});
+  await expect(page.locator('#dock-1 .read-status')).toHaveText('Full');
+  await page.getByRole('button',{name:'점검 삭제',exact:true}).click();await page.locator('#confirm-action').click();
+  await expect(page.locator('h1')).toHaveText('11:30');
+  await page.getByRole('button',{name:'수정',exact:true}).click();
+  await page.locator('#dock-1 [data-field="status"]').selectOption('Full');
+  await page.getByRole('button',{name:'수정 취소',exact:true}).click();await page.locator('#confirm-action').click();
+  await expect(page.locator('#dock-1 .read-status')).toHaveText('Empty');
+  await next(page,'13:30');await page.getByRole('button',{name:'다음 점검 취소',exact:true}).click();await page.locator('#confirm-action').click();
+  await expect(page.locator('h1')).toHaveText('11:30');
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dock-notes-v1')).records.length)).toBe(3);
+});
+test('compact result shows at least ten populated docks and exact working ranges',async({page})=>{
+  await start(page);
+  await page.evaluate(()=>{
+    state.draft.rows.forEach((row,i)=>{row.container='DEMO-'+(i+1);row.codes=['DEMO-I'];row.status='Full';});persist();render();
+  });
+  await page.getByRole('button',{name:'저장 · 점검 보기'}).click();
+  const visible=await page.locator('.dock.compact').evaluateAll(nodes=>nodes.filter(el=>{const r=el.getBoundingClientRect();return r.top>=0&&r.bottom<=window.innerHeight-65;}).length);
+  expect(visible).toBeGreaterThanOrEqual(10);
+  await expect(page.locator('#dock-1 .dock-line')).toContainText('DEMO-1');
+  await page.locator('[data-range="9-13"]').click();await expect(page.locator('.dock')).toHaveCount(5);
+  await expect(page.locator('.dock').first()).toHaveAttribute('id','dock-9');await expect(page.locator('.dock').last()).toHaveAttribute('id','dock-13');
+  await page.locator('[data-range="14-20"]').click();await expect(page.locator('.dock')).toHaveCount(7);
+  await page.locator('[data-range="all"]').click();await page.locator('#toast').waitFor({state:'hidden'});
+  await page.screenshot({path:'test-results/05-compact-results.png'});
 });

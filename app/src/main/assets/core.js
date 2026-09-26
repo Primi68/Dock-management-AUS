@@ -101,14 +101,36 @@
     const s=JSON.parse(raw);
     if (!s || s.schema!==1 || !Array.isArray(s.records) || s.records.length>10000 || !(s.draft===null || typeof s.draft==='object')) throw new Error('지원하지 않는 백업 형식입니다.');
     validateSettings(s.settings);
+    // Older versions removed the original record while editing the latest one.
+    // Preserve the recoverable snapshot before introducing cancellable edits.
+    if(s.draft && s.draft.savedAt && !s.draft.editOf && !s.records.some(r=>r.id===s.draft.id)){
+      s.records.push(clone(s.draft));s.draft.editOf=s.draft.id;
+    }
     const ids=new Set(), slots=new Set(); let prior='';
-    for (const r of [...s.records,...(s.draft?[s.draft]:[])]) {
+    const editingOriginal=s.draft && s.draft.editOf;
+    if(editingOriginal && (s.draft.id!==editingOriginal || !s.records.some(r=>r.id===editingOriginal))) throw new Error('수정 중인 원본 기록을 찾을 수 없습니다.');
+    for (const r of [...s.records,...(s.draft && !editingOriginal?[s.draft]:[])]) {
       if (!r || typeof r.id!=='string' || !r.id || ids.has(r.id) || !validDate(r.date) || !validTime(r.time) || !Array.isArray(r.corrections) || r.corrections.some(n=>!Number.isInteger(n)||n<1||n>20)) throw new Error('점검 기록이 올바르지 않습니다.');
       const slot=`${r.date} ${r.time}`;
       if (slots.has(slot) || (prior && slot<=prior)) throw new Error('점검 날짜 순서 또는 중복을 확인해 주세요.');
       prior=slot; ids.add(r.id); slots.add(slot);
       validateRows(r.rows); if(r.baseline!==null) validateRows(r.baseline);
       validateSettings({...s.settings,groups:r.groups});
+    }
+    if(editingOriginal){
+      const original=s.records.find(r=>r.id===editingOriginal);
+      if(s.draft.date!==original.date || s.draft.time!==original.time)throw new Error('기존 점검의 날짜와 시간은 유지해야 합니다.');
+      validateRows(s.draft.rows);if(s.draft.baseline!==null)validateRows(s.draft.baseline);
+      validateSettings({...s.settings,groups:s.draft.groups});
+      if(!Array.isArray(s.draft.corrections)||s.draft.corrections.some(n=>!Number.isInteger(n)||n<1||n>20))throw new Error('변경 표시가 올바르지 않습니다.');
+    }
+    if(s.draft)for(const key of ['pendingContainers','containerUndo']){
+      const map=s.draft[key];if(map===undefined)continue;
+      if(!map || typeof map!=='object' || Array.isArray(map))throw new Error('번호 수정 복구 정보가 올바르지 않습니다.');
+      for(const [dock,row] of Object.entries(map)){
+        const n=Number(dock);if(!Number.isInteger(n)||n<1||n>20||String(n)!==dock)throw new Error('복구할 Dock 번호가 올바르지 않습니다.');
+        const rows=Array.from({length:20},(_,i)=>blankRow(i+1));rows[n-1]=row;validateRows(rows);
+      }
     }
     return s;
   }

@@ -62,3 +62,14 @@ test('text export keeps order, all groups, Unicode notes, and change labels',()=
   const r=C.newRecord(C.initial(),'2026-09-25','07:30');r.rows[0].container='DEMO-A';r.rows[0].note='확인 필요';
   const text=C.text(r);assert.match(text,/확인 필요/);assert.match(text,/새 컨테이너/);assert.ok(text.indexOf('Tires')<text.indexOf('Wheels'));assert.match(text,/\n20\n/);
 });
+test('historical edit draft can restart without replacing the saved original',()=>{
+  const s=C.initial();s.records.push(C.newRecord(s,'2026-09-25','07:30'));s.records.push(C.newRecord(s,'2026-09-25','09:30'));
+  s.draft={...C.clone(s.records[0]),editOf:s.records[0].id};s.draft.rows[0].status='Full';
+  const restored=C.parseBackup(JSON.stringify(s));assert.equal(restored.records[0].rows[0].status,'');assert.equal(restored.draft.rows[0].status,'Full');
+  s.draft.editOf='missing';assert.throws(()=>C.parseBackup(JSON.stringify(s)));
+});
+test('number-edit recovery payload is validated before restoring',()=>{
+  const s=C.initial();s.draft=C.newRecord(s,'2026-09-25','07:30');s.draft.pendingContainers={'1':C.blankRow(1)};
+  assert.equal(C.parseBackup(JSON.stringify(s)).draft.pendingContainers[1].dock,1);
+  s.draft.pendingContainers={'99':C.blankRow(1)};assert.throws(()=>C.parseBackup(JSON.stringify(s)));
+});
