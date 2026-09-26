@@ -1,6 +1,6 @@
 # 설치와 백업
 
-저장소 접근 권한이 있는 계정으로 GitHub에 로그인하고 Releases의 `Dock-Notes-0.2.1-preview.apk`를 Android에 받습니다. 파일을 열고 요청되는 경우 해당 브라우저/파일 앱의 `알 수 없는 앱 설치`를 허용합니다. **Android 8 이상**에서 Dock Notes를 실행합니다. private 저장소 링크는 로그인 없이 접근할 수 없습니다. 함께 제공된 SHA256SUMS.txt로 파일 해시를 검증할 수 있습니다.
+저장소 접근 권한이 있는 계정으로 GitHub에 로그인하고 Releases의 `Dock-Notes-0.3.0-preview.apk`를 Android에 받습니다. 파일을 열고 요청되는 경우 해당 브라우저/파일 앱의 `알 수 없는 앱 설치`를 허용합니다. **Android 8 이상**에서 Dock Notes를 실행합니다. private 저장소 링크는 로그인 없이 접근할 수 없습니다. 함께 제공된 SHA256SUMS.txt로 파일 해시를 검증할 수 있습니다.
 
 다음 점검을 한 번 누르면 최근 기록이 즉시 불러와집니다. 변경 내용 수정 → 저장 · 점검 보기로 사용합니다. 날짜·점검 시간은 자동 지정되며 필요한 경우에만 수정합니다. 컨테이너 번호는 바로 타이핑합니다. 변경 후 다른 칸으로 이동하면 이전 내용이 비워집니다. 오타 수정은 번호 아래의 이전 내용 되살리기를 사용하고 반출은 Ready to drop을 선택해 확인합니다.
 
@@ -17,3 +17,14 @@
 ## 되돌리기
 
 작성 화면 하단의 ↶ 되돌리기로 마지막 수정을 복구하고 ↷로 다시 실행합니다. Ready to drop으로 비운 내용도 번호·코드·상태·메모를 한 번에 되돌립니다. 입력칸에서 이어 적은 글자는 한 단계로 묶습니다. 최대 50단계이며 임시 작성 중에는 재실행해도 유지됩니다. 저장하면 편집 내역은 초기화됩니다.
+
+
+## 0.3 언어 설정
+
+메뉴(☰) → 점검 시간 · 구역 설정 → 언어 / Language에서 English를 선택하고 설정 저장을 누릅니다. 즉시 영어로 전환되며 앱을 다시 열어도 유지됩니다. 한국어로 돌아오려면 Settings → Language / 언어 → 한국어 → Save settings를 누릅니다. 취소하면 현재 언어를 유지합니다.
+
+버튼, 항목 이름, 확인 창, 오류 안내, 복사·텍스트 내보내기의 변경 표시가 선택한 언어를 사용합니다. 직접 적은 컨테이너 번호·코드·내용물·메모와 구역 제목은 자동 번역하지 않습니다. 따라서 기존에 한국어로 저장한 구역 이름은 영어 화면에서도 그대로 보이며 설정에서 직접 바꿀 수 있습니다. 상태 값은 기존처럼 Full / In process / Empty / Ready to drop을 사용합니다. Android 시스템 파일 선택기의 언어는 휴대전화 설정을 따릅니다.
+
+언어 설정은 JSON 전체 백업에 포함됩니다. 복원하면 백업의 언어 설정도 적용됩니다. 언어 설정이 없는 구버전 백업은 한국어로 열립니다. 기존 점검·비교 기준·작성 중 되돌리기 이력은 언어 변경으로 바뀌지 않습니다.
+
+English: Open ☰ → Settings · Times, groups & language, choose English and tap Save settings. Your entered records and group names stay unchanged. Before replacing an older preview APK, export a full JSON backup. If Android rejects the update because the signing certificate differs, uninstall only after saving that backup, install the new APK, and restore it from the menu.

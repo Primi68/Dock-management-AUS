@@ -16,6 +16,7 @@ JDK 17 / Android SDK Platform 35 및 Build Tools 35.0.0 / Gradle 8.11.1 / Node 2
 
 결과 APK: `app/build/outputs/apk/debug/app-debug.apk`. `npm run preview`는 PC 브라우저 확인용이며 Android 파일 선택기는 기기 검증이 필요합니다. 브라우저 미리보기는 브라우저 로컬 저장소를 사용합니다.
 
+- assets/i18n.js: 한국어 원문을 키로 하는 영어 UI 사전과 매개변수 치환. 사용자 입력은 번역 함수에 전달하지 않습니다.
 - assets/core.js: 순수 업무 규칙, 날짜, 차이, 백업 검증.
 - assets/app.js 및 style.css: 입력·조회·설정 화면.
 - MainActivity.java: 오프라인 WebView, 원자적 저장, Android 클립보드/파일 선택기.
