@@ -53,7 +53,7 @@ function render(){
 function groupHtml(r,g){
   const rows=r.rows.filter(row=>row.dock>=g.start&&row.dock<=g.end&&(!onlyChanged||editing||change(r,row).fields.length));
   if(!rows.length)return '';
-  return `<section class="group"><div class="group-title"><h2 style="margin:0">${esc(g.name)}</h2><small>Dock ${g.start}${g.end!==g.start?'–'+g.end:''}</small></div>${rows.map(row=>rowHtml(r,row)).join('')}</section>`;
+  return `<section class="group"><div class="group-title"><h3>${esc(g.name)}</h3><small>Dock ${g.start}${g.end!==g.start?'–'+g.end:''}</small></div>${rows.map(row=>rowHtml(r,row)).join('')}</section>`;
 }
 function rowHtml(r,row){
   const d=change(r,row), marked=f=>d.fields.includes(f)?'changed':'', empty=row.status==='Ready to drop';

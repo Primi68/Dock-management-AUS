@@ -9,10 +9,10 @@ npm ci
 npm test
 npx playwright install chromium
 npm run test:ui
-gradle :app:assembleDebug :app:lintDebug
+./gradlew :app:assembleDebug :app:lintDebug
 ```
 
-JDK 17 / Android SDK Platform 35 및 Build Tools 35.0.0 / Gradle 8.11.1 / Node 22 사용. [AGP 8.9 공식 호환성](https://developer.android.com/build/releases/agp-8-9-0-release-notes)에 맞춰 AGP 8.9.2를 고정했습니다. Android Studio에서 프로젝트를 열고 SDK 위치를 설정하거나 ANDROID_HOME을 설정합니다. PC별 local.properties는 커밋하지 않습니다.
+JDK 17 / Android SDK Platform 35 및 Build Tools 35.0.0 / Gradle 8.11.1 / Node 22 사용. Gradle은 공식 체크섬을 고정한 Wrapper로 다운로드됩니다. Windows PowerShell에서는 `./gradlew.bat :app:assembleDebug :app:lintDebug`를 사용하세요. [AGP 8.9 공식 호환성](https://developer.android.com/build/releases/agp-8-9-0-release-notes)에 맞춰 AGP 8.9.2를 고정했습니다. Android Studio에서 프로젝트를 열고 SDK 위치를 설정하거나 ANDROID_HOME을 설정합니다. PC별 local.properties는 커밋하지 않습니다.
 
 결과 APK: `app/build/outputs/apk/debug/app-debug.apk`. `npm run preview`는 PC 브라우저 확인용이며 Android 파일 선택기는 기기 검증이 필요합니다. 브라우저 미리보기는 브라우저 로컬 저장소를 사용합니다.
 

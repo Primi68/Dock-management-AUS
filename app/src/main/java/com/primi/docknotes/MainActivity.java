@@ -95,9 +95,12 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface public void exportFile(String name, String mime, String text) {
             runOnUiThread(() -> {
-                pendingExport = text;
-                Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(mime).putExtra(Intent.EXTRA_TITLE, name);
-                startActivityForResult(intent, EXPORT);
+                try {
+                    try (FileOutputStream out = openFileOutput("pending-export.txt", MODE_PRIVATE)) { out.write(text.getBytes(StandardCharsets.UTF_8)); }
+                    pendingExport = text;
+                    Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(mime).putExtra(Intent.EXTRA_TITLE, name);
+                    startActivityForResult(intent, EXPORT);
+                } catch (Exception e) { message("내보내기를 시작하지 못했습니다."); }
             });
         }
         @JavascriptInterface public void importFile() {
@@ -107,14 +110,15 @@ public class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
-        if (result != RESULT_OK || data == null || data.getData() == null) { pendingExport = null; return; }
+        if (result != RESULT_OK || data == null || data.getData() == null) { pendingExport = null; deleteFile("pending-export.txt"); return; }
         try {
-            if (request == EXPORT && pendingExport != null) {
+            if (request == EXPORT) {
+                if (pendingExport == null) pendingExport = read(openFileInput("pending-export.txt"));
                 try (OutputStream out = getContentResolver().openOutputStream(data.getData())) {
                     if (out == null) throw new IOException();
                     out.write(pendingExport.getBytes(StandardCharsets.UTF_8));
                 }
-                pendingExport = null; message("파일을 저장했습니다");
+                pendingExport = null; deleteFile("pending-export.txt"); message("파일을 저장했습니다");
             } else if (request == IMPORT) {
                 String json = read(getContentResolver().openInputStream(data.getData()));
                 web.evaluateJavascript("window.receiveBackup(" + JSONObject.quote(json) + ")", null);

@@ -54,3 +54,14 @@ test('empty state and no horizontal overflow on narrow phones',async({page})=>{
   await page.screenshot({path:'test-results/04-editing.png'});
   await page.setViewportSize({width:320,height:700});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });
+test('late number entry preserves observations and same-container typo correction preserves contents',async({page})=>{
+  await start(page);
+  await page.locator('#dock-1 [data-field="codes"]').fill('DEMO-LATE-CODE');
+  await page.locator('#dock-1 [data-field="status"]').selectOption('Full');
+  await container(page,'DEMO-NUMBER-LATE');
+  await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('DEMO-LATE-CODE');
+  await expect(page.locator('#dock-1 [data-field="status"]')).toHaveValue('Full');
+  await page.getByRole('button',{name:'저장 · 점검 보기'}).click();await next(page,'09:30');
+  await page.locator('#dock-1 [data-action="container"]').click();await page.locator('#container-value').fill('DEMO-NUMBER-CORRECTED');await page.locator('#correct-container').click();
+  await expect(page.locator('#dock-1')).not.toHaveClass(/whole/);await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('DEMO-LATE-CODE');
+});

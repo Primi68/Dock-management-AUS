@@ -20,7 +20,7 @@ npm ci
 npm test
 npx playwright install chromium
 npm run test:ui
-gradle :app:assembleDebug :app:lintDebug
+./gradlew :app:assembleDebug :app:lintDebug
 ```
 
 JDK 17 / SDK 35 / Gradle 8.11.1. 앱에 포함된 HTML/CSS/JS와 Android Java 호스트로 동작하며 외부 웹사이트에 접속하지 않습니다.
