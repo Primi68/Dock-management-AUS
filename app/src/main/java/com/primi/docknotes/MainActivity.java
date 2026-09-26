@@ -21,12 +21,14 @@ public class MainActivity extends Activity {
     private WebView web;
     private AtomicFile storage;
     private String pendingExport;
+    private volatile String language = "ko";
     private static final int EXPORT = 10, IMPORT = 11;
     private static final int MAX_BYTES = 20 * 1024 * 1024;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         storage = new AtomicFile(new File(getFilesDir(), "dock-state.json"));
+        language = getPreferences(MODE_PRIVATE).getString("language", "ko");
         if (state != null) pendingExport = state.getString("export");
         web = new WebView(this);
         web.setBackgroundColor(Color.rgb(246, 247, 243));
@@ -71,8 +73,16 @@ public class MainActivity extends Activity {
     }
 
     private void message(String text) { runOnUiThread(() -> Toast.makeText(this, text, Toast.LENGTH_LONG).show()); }
+    private String translated(String korean, String english) { return "en".equals(language) ? english : korean; }
 
     public class Bridge {
+        @JavascriptInterface public void setLanguage(String value) {
+            String next = "en".equals(value) ? "en" : "ko";
+            if (!next.equals(language)) {
+                language = next;
+                getPreferences(MODE_PRIVATE).edit().putString("language", next).apply();
+            }
+        }
         @JavascriptInterface public synchronized String load() {
             try { return read(storage.openRead()); }
             catch (FileNotFoundException e) { return ""; }
@@ -90,7 +100,7 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void copy(String text) {
             runOnUiThread(() -> {
                 ((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Dock check", text));
-                message("점검 기록을 복사했습니다");
+                message(translated("점검 기록을 복사했습니다", "Check copied"));
             });
         }
         @JavascriptInterface public void exportFile(String name, String mime, String text) {
@@ -100,7 +110,7 @@ public class MainActivity extends Activity {
                     pendingExport = text;
                     Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(mime).putExtra(Intent.EXTRA_TITLE, name);
                     startActivityForResult(intent, EXPORT);
-                } catch (Exception e) { message("내보내기를 시작하지 못했습니다."); }
+                } catch (Exception e) { message(translated("내보내기를 시작하지 못했습니다.", "Could not start the export.")); }
             });
         }
         @JavascriptInterface public void importFile() {
@@ -118,12 +128,12 @@ public class MainActivity extends Activity {
                     if (out == null) throw new IOException();
                     out.write(pendingExport.getBytes(StandardCharsets.UTF_8));
                 }
-                pendingExport = null; deleteFile("pending-export.txt"); message("파일을 저장했습니다");
+                pendingExport = null; deleteFile("pending-export.txt"); message(translated("파일을 저장했습니다", "File saved"));
             } else if (request == IMPORT) {
                 String json = read(getContentResolver().openInputStream(data.getData()));
                 web.evaluateJavascript("window.receiveBackup(" + JSONObject.quote(json) + ")", null);
             }
-        } catch (Exception e) { pendingExport = null; message("파일을 처리하지 못했습니다. 저장 공간과 파일을 확인해 주세요."); }
+        } catch (Exception e) { pendingExport = null; message(translated("파일을 처리하지 못했습니다. 저장 공간과 파일을 확인해 주세요.", "Could not process the file. Check the file and available storage.")); }
     }
     @Override public void onBackPressed() { web.evaluateJavascript("window.handleBack()", null); }
     @Override protected void onDestroy() { web.removeJavascriptInterface("DockNative"); web.destroy(); super.onDestroy(); }

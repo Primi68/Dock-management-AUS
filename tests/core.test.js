@@ -2,6 +2,28 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const C=require('../app/src/main/assets/core.js');
 const date=s=>new Date(s);
+
+test('language survives backup restore and older backups default to Korean without altering records',()=>{
+  const s=C.initial();s.draft=C.newRecord(s,'2026-09-25','07:30');
+  s.draft.rows[0].container='DEMO-A';s.draft.rows[0].note='메모';
+  const original=C.clone(s.draft);s.settings.language='en';
+  const restored=C.parseBackup(JSON.stringify(s));
+  assert.equal(restored.settings.language,'en');assert.deepEqual(restored.draft,original);
+  delete s.settings.language;
+  const legacy=C.parseBackup(JSON.stringify(s));
+  assert.equal(legacy.settings.language,'ko');assert.deepEqual(legacy.draft,original);
+  s.settings.language='unsupported';assert.throws(()=>C.parseBackup(JSON.stringify(s)),/언어/);
+});
+
+test('English exports localize generated markers but never translate entered text or historical groups',()=>{
+  const s=C.initial(),r=C.newRecord(s,'2026-09-25','07:30');
+  r.groups[0].name='메모';r.rows[0].container='DEMO-A';r.rows[0].note='새 컨테이너';
+  assert.match(C.text(r,'en'),/메모 · Dock 1~8/);
+  assert.match(C.text(r,'en'),/DEMO-A 새 컨테이너 \[New container\]/);
+  assert.match(C.text(r,'ko'),/\[새 컨테이너\]/);
+  r.baseline=C.clone(r.rows);r.rows[0].status='Empty';
+  assert.match(C.text(r,'en'),/\[Changed: Status\]/);
+});
 test('15-minute early checks select the intended scheduled time',()=>{
   const s=C.defaults();
   for(const [now,time] of [['2026-09-25T07:15:00','07:30'],['2026-09-25T09:14:59','07:30'],['2026-09-25T09:15:00','09:30'],['2026-09-25T11:40:00','11:30'],['2026-09-25T13:15:00','13:30']])assert.equal(C.suggest(date(now),s,[]).time,time);

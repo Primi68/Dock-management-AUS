@@ -1,4 +1,61 @@
 const {test,expect}=require('@playwright/test');
+
+async function settings(page){await page.locator('#menu').click();await page.locator('[data-action="settings"]').click();}
+async function language(page,value){await settings(page);await page.locator('#settings-language').selectOption(value);await page.locator('[data-action="save-settings"]').click();}
+
+test('English setting persists, restores from backup and preserves user text, drafts and undo history',async({page})=>{
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await start(page);await container(page,'DEMO-EN');
+  await page.locator('#dock-1 [data-field="note"]').fill('메모');
+  const before=await page.evaluate(()=>JSON.parse(localStorage.getItem('dock-notes-v1')));
+  await language(page,'en');await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.getByRole('button',{name:'Save · View check'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Undo',exact:true})).toBeEnabled();
+  await expect(page.locator('#dock-1 .change-tag')).toHaveText('New container');
+  await expect(page.locator('#save-status')).toHaveText('Draft saved on this device');
+  const after=await page.evaluate(()=>JSON.parse(localStorage.getItem('dock-notes-v1')));
+  expect(after.draft).toEqual(before.draft);expect(after.records).toEqual(before.records);expect(after.settings.groups).toEqual(before.settings.groups);
+  await page.reload();await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.locator('#dock-1 [data-field="note"]')).toHaveValue('메모');
+  await page.getByRole('button',{name:'Undo',exact:true}).click();await expect(page.locator('#dock-1 [data-field="note"]')).toHaveValue('');
+  await page.getByRole('button',{name:'Redo',exact:true}).click();await expect(page.locator('#dock-1 [data-field="note"]')).toHaveValue('메모');
+  await page.getByRole('button',{name:'Save · View check'}).click();
+  const backup=await page.evaluate(()=>localStorage.getItem('dock-notes-v1'));
+  await page.locator('#dock-1 .dock-line').click();await expect(page.locator('#dialog')).toContainText('메모');await expect(page.locator('#dialog')).toContainText('New container');await page.getByRole('button',{name:'Close',exact:true}).click();
+  await language(page,'ko');await expect(page.getByRole('button',{name:'다음 점검 →',exact:true})).toBeVisible();
+  await page.evaluate(raw=>window.receiveBackup(raw),backup);await page.locator('#confirm-action').click();
+  await expect(page.locator('html')).toHaveAttribute('lang','en');await expect(page.locator('#dock-1 .read-note')).toHaveText('메모');
+  await page.locator('#menu').click();await page.getByRole('button',{name:'Check history',exact:true}).click();
+  await expect(page.locator('.history-item small')).toHaveText('1 changed · View check');
+  expect(errors).toEqual([]);
+});
+
+test('English schedule, validation, departure confirmation, exports and settings cancellation',async({page})=>{
+  await page.goto('/');await language(page,'en');await expect(page.getByRole('button',{name:'Start first check →'})).toBeVisible();
+  await page.getByRole('button',{name:'Start first check →'}).click();
+  await page.getByRole('button',{name:'Change check date / time'}).click();
+  await page.locator('#new-date').fill('');await page.getByRole('button',{name:'Apply time'}).click();
+  await expect(page.locator('#new-error')).toHaveText('Check the date and inspection time.');
+  await page.locator('#new-date').fill('2026-09-25');await page.locator('#new-time').selectOption('07:30');await page.getByRole('button',{name:'Apply time'}).click();
+  await container(page,'DEMO-EN');await page.locator('#dock-1 [data-field="note"]').fill('메모');
+  await page.locator('#dock-1 [data-field="status"]').selectOption('Ready to drop');
+  await expect(page.getByRole('heading',{name:'Has the container left?'})).toBeVisible();
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();await expect(page.locator('#dock-1 [data-field="container"]')).toHaveValue('DEMO-EN');
+  await page.getByRole('button',{name:'Save · View check'}).click();
+  const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Save text',exact:true}).click();
+  const download=await downloadPromise;const content=require('fs').readFileSync(await download.path(),'utf8');
+  expect(content).toContain('DEMO-EN 메모 [New container]');
+  await page.evaluate(()=>window.receiveBackup('{broken'));await expect(page.locator('#toast')).toHaveText('Not restored: The backup is not valid JSON.');
+  await settings(page);await page.locator('#settings-times').fill('invalid');await page.getByRole('button',{name:'Save settings'}).click();
+  await expect(page.locator('#settings-error')).toHaveText('Enter 1–24 different valid check times.');
+  await page.locator('#settings-language').selectOption('ko');await page.getByRole('button',{name:'Cancel',exact:true}).click();await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await settings(page);await expect(page.locator('#settings-language')).toHaveValue('en');
+  await page.locator('#toast').waitFor({state:'hidden'});
+  await page.screenshot({path:'test-results/07-english-settings.png'});
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();await page.getByRole('button',{name:'Edit',exact:true}).click();
+  await page.screenshot({path:'test-results/08-english-editing.png'});
+  await page.setViewportSize({width:320,height:700});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+});
 async function start(page){
   await page.goto('/');await page.getByRole('button',{name:'첫 점검 만들기'}).click();
   await expect(page.locator('.dock')).toHaveCount(20);

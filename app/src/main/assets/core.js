@@ -1,8 +1,8 @@
 (function(root, factory) {
-  const api = factory();
+  const api = factory(typeof module === 'object' && module.exports ? require('./i18n.js') : root.DockI18n);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.DockCore = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function() {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function(I18n) {
   'use strict';
   const clone = value => JSON.parse(JSON.stringify(value));
   const pad = n => String(n).padStart(2, '0');
@@ -13,7 +13,7 @@
   const statuses = ['', 'Full', 'In process', 'Empty', 'Ready to drop'];
   const blankRow = n => ({dock:n, container:'', codes:[''], contents:'', status:'', note:''});
   const defaults = () => ({
-    times:['07:30','09:30','11:30','13:30','15:30'], days:[1,2,3,4,5],
+    language:'ko', times:['07:30','09:30','11:30','13:30','15:30'], days:[1,2,3,4,5],
     groups:[{name:'Tires',start:1,end:8},{name:'Dunnage',start:9,end:12},{name:'쓰레기',start:13,end:13},{name:'Wheels',start:14,end:20}]
   });
   const initial = () => ({schema:1, settings:defaults(), records:[], draft:null});
@@ -77,13 +77,14 @@
       baseline:latest?clone(latest.rows):null, corrections:[]
     };
   }
-  function text(record) {
+  function text(record, language='ko') {
+    const t=key=>I18n.translate(key,language);
     let lines=[`${record.date} · ${record.time}${record.time==='24:00'?' (close)':''}`,''];
     for (const group of record.groups) {
       lines.push(`${group.name} · Dock ${group.start}${group.start!==group.end?'~'+group.end:''}`);
       for (const row of record.rows.filter(r=>r.dock>=group.start && r.dock<=group.end)) {
         const change=diff(row,record.baseline && record.baseline[row.dock-1],record.corrections.includes(row.dock));
-        const marker=change.fields.length?` [${change.whole?change.label:'변경: '+change.fields.map(f=>({container:'번호',codes:'코드',contents:'내용물',status:'상태',note:'메모'}[f])).join(', ')}]`:'';
+        const marker=change.fields.length?` [${change.whole?t(change.label):t('변경: ')+change.fields.map(f=>t({container:'번호',codes:'코드',contents:'내용물',status:'상태',note:'메모'}[f])).join(', ')}]`:'';
         lines.push([row.dock,row.container,row.codes.filter(Boolean).join(' / '),row.contents,row.status,row.note].filter(v=>v!=='').join(' ')+marker);
       }
       lines.push('');
@@ -91,6 +92,7 @@
     return lines.join('\n');
   }
   function validateSettings(s) {
+    if (s && s.language!==undefined && !['ko','en'].includes(s.language)) throw new Error('지원하지 않는 언어입니다.');
     if (!s || !Array.isArray(s.times) || !s.times.length || s.times.length>24 || s.times.some(t=>!validTime(t)) || new Set(s.times).size!==s.times.length) throw new Error('중복 없는 점검 시간을 1~24개 입력해 주세요.');
     if (!Array.isArray(s.days) || !s.days.length || s.days.some(d=>!Number.isInteger(d)||d<0||d>6) || new Set(s.days).size!==s.days.length) throw new Error('근무 요일을 선택해 주세요.');
     if (!Array.isArray(s.groups) || !s.groups.length || s.groups.length>20) throw new Error('구역을 확인해 주세요.');
@@ -109,9 +111,11 @@
   }
   function parseBackup(raw) {
     if (raw.length>20*1024*1024) throw new Error('백업 파일이 너무 큽니다.');
-    const s=JSON.parse(raw);
+    let s;
+    try { s=JSON.parse(raw); } catch(e) { throw new Error('백업 파일의 JSON 형식이 올바르지 않습니다.'); }
     if (!s || s.schema!==1 || !Array.isArray(s.records) || s.records.length>10000 || !(s.draft===null || typeof s.draft==='object')) throw new Error('지원하지 않는 백업 형식입니다.');
     validateSettings(s.settings);
+    if(s.settings.language===undefined)s.settings.language='ko';
     // Older versions removed the original record while editing the latest one.
     // Preserve the recoverable snapshot before introducing cancellable edits.
     if(s.draft && s.draft.savedAt && !s.draft.editOf && !s.records.some(r=>r.id===s.draft.id)){
