@@ -73,3 +73,28 @@ test('number-edit recovery payload is validated before restoring',()=>{
   assert.equal(C.parseBackup(JSON.stringify(s)).draft.pendingContainers[1].dock,1);
   s.draft.pendingContainers={'99':C.blankRow(1)};assert.throws(()=>C.parseBackup(JSON.stringify(s)));
 });
+test('undo and redo restore a full dock operation including cleared fields',()=>{
+  const r=C.newRecord(C.initial(),'2026-09-25','07:30');
+  Object.assign(r.rows[0],{container:'DEMO-A',codes:['DEMO-I1','DEMO-I2'],status:'Full',contents:'demo',note:'check'});
+  const before=C.clone(r.rows[0]);C.rememberEdit(r);Object.assign(r.rows[0],{container:'',codes:[''],status:'Ready to drop',contents:'',note:''});
+  assert.equal(C.travelEdit(r),true);assert.deepEqual(r.rows[0],before);
+  assert.equal(C.travelEdit(r,true),true);assert.equal(r.rows[0].status,'Ready to drop');assert.equal(r.rows[0].container,'');
+});
+test('text edits coalesce, new edits invalidate redo, and history is bounded',()=>{
+  const r=C.newRecord(C.initial(),'2026-09-25','07:30');
+  C.rememberEdit(r);r.rows[0].note='D';C.rememberEdit(r,true);r.rows[0].note='DEMO';
+  assert.equal(r.undoHistory.length,1);C.travelEdit(r);assert.equal(r.rows[0].note,'');
+  C.rememberEdit(r);r.rows[0].note='different';assert.equal(C.travelEdit(r,true),false);
+  for(let i=0;i<60;i++){C.rememberEdit(r);r.rows[0].note=String(i);}assert.equal(r.undoHistory.length,50);
+});
+test('draft undo and redo survive backup restore without changing saved records',()=>{
+  const s=C.initial();s.records.push(C.newRecord(s,'2026-09-25','07:30'));
+  s.draft={...C.clone(s.records[0]),editOf:s.records[0].id};C.rememberEdit(s.draft);s.draft.rows[0].status='Full';
+  const restored=C.parseBackup(JSON.stringify(s));assert.equal(C.travelEdit(restored.draft),true);assert.equal(restored.draft.rows[0].status,'');assert.equal(restored.records[0].rows[0].status,'');
+  assert.equal(C.travelEdit(C.parseBackup(JSON.stringify(restored)).draft,true),true);
+});
+test('malformed undo snapshots and time travel across saved records are rejected',()=>{
+  const s=C.initial();s.records.push(C.newRecord(s,'2026-09-25','07:30'));s.draft=C.newRecord(s,'2026-09-25','09:30');C.rememberEdit(s.draft);
+  s.draft.undoHistory[0].time='07:30';assert.throws(()=>C.parseBackup(JSON.stringify(s)));
+  s.draft.undoHistory=[{rows:[]}];assert.throws(()=>C.parseBackup(JSON.stringify(s)));
+});

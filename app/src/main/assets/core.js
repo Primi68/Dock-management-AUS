@@ -18,6 +18,17 @@
   });
   const initial = () => ({schema:1, settings:defaults(), records:[], draft:null});
   const normalized = s => s.trim().replace(/\s+/g,' ').toUpperCase();
+  const editSnapshot = r => clone({date:r.date,time:r.time,rows:r.rows,corrections:r.corrections,pendingContainers:r.pendingContainers||{},containerUndo:r.containerUndo||{}});
+  function rememberEdit(r, coalesce=false){
+    r.undoHistory=r.undoHistory||[];r.redoHistory=[];
+    if(!coalesce || !r.undoHistory.length){r.undoHistory.push(editSnapshot(r));if(r.undoHistory.length>50)r.undoHistory.shift();}
+  }
+  function travelEdit(r, redo=false){
+    const from=redo?'redoHistory':'undoHistory',to=redo?'undoHistory':'redoHistory';
+    if(!r[from]?.length)return false;
+    r[to]=r[to]||[];r[to].push(editSnapshot(r));if(r[to].length>50)r[to].shift();
+    Object.assign(r,clone(r[from].pop()));return true;
+  }
   function diff(row, before, correction) {
     if (!before) before = blankRow(row.dock);
     const containerChanged = normalized(row.container) !== normalized(before.container);
@@ -124,8 +135,20 @@
       validateSettings({...s.settings,groups:s.draft.groups});
       if(!Array.isArray(s.draft.corrections)||s.draft.corrections.some(n=>!Number.isInteger(n)||n<1||n>20))throw new Error('변경 표시가 올바르지 않습니다.');
     }
-    if(s.draft)for(const key of ['pendingContainers','containerUndo']){
-      const map=s.draft[key];if(map===undefined)continue;
+    const recoveryStates=s.draft?[s.draft]:[];
+    if(s.draft)for(const key of ['undoHistory','redoHistory']){
+      const history=s.draft[key];if(history===undefined)continue;
+      if(!Array.isArray(history)||history.length>50)throw new Error('되돌리기 기록이 올바르지 않습니다.');
+      for(const snapshot of history){
+        if(!snapshot||!validDate(snapshot.date)||!validTime(snapshot.time)||!Array.isArray(snapshot.corrections)||snapshot.corrections.some(n=>!Number.isInteger(n)||n<1||n>20))throw new Error('되돌리기 항목이 올바르지 않습니다.');
+        validateRows(snapshot.rows);
+        if(editingOriginal&&(snapshot.date!==s.draft.date||snapshot.time!==s.draft.time))throw new Error('되돌리기 날짜가 올바르지 않습니다.');
+        if(!editingOriginal&&s.records.length){const last=s.records[s.records.length-1];if(`${snapshot.date} ${snapshot.time}`<=`${last.date} ${last.time}`)throw new Error('되돌리기 시간 순서가 올바르지 않습니다.');}
+        recoveryStates.push(snapshot);
+      }
+    }
+    for(const recovery of recoveryStates)for(const key of ['pendingContainers','containerUndo']){
+      const map=recovery[key];if(map===undefined)continue;
       if(!map || typeof map!=='object' || Array.isArray(map))throw new Error('번호 수정 복구 정보가 올바르지 않습니다.');
       for(const [dock,row] of Object.entries(map)){
         const n=Number(dock);if(!Number.isInteger(n)||n<1||n>20||String(n)!==dock)throw new Error('복구할 Dock 번호가 올바르지 않습니다.');
@@ -134,5 +157,5 @@
     }
     return s;
   }
-  return {clone,dateKey,validDate,validTime,minutes,statuses,blankRow,defaults,initial,normalized,diff,suggest,newRecord,text,validateSettings,parseBackup};
+  return {clone,dateKey,validDate,validTime,minutes,statuses,blankRow,defaults,initial,normalized,editSnapshot,rememberEdit,travelEdit,diff,suggest,newRecord,text,validateSettings,parseBackup};
 });

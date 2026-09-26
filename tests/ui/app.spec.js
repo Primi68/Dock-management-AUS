@@ -119,3 +119,31 @@ test('compact result shows at least ten populated docks and exact working ranges
   await page.locator('[data-range="all"]').click();await page.locator('#toast').waitFor({state:'hidden'});
   await page.screenshot({path:'test-results/05-compact-results.png'});
 });
+test('ready to drop can be undone and redone after restarting the draft',async({page})=>{
+  await start(page);await container(page,'DEMO-A');await page.locator('#dock-1 [data-field="codes"]').fill('DEMO-I');
+  await page.locator('#dock-1 [data-field="contents"]').fill('demo cargo');await page.locator('#dock-1 [data-field="note"]').fill('demo note');
+  await page.locator('#dock-1 [data-field="status"]').selectOption('Full');await page.getByRole('button',{name:'저장 · 점검 보기'}).click();
+  await page.getByRole('button',{name:'수정',exact:true}).click();await expect(page.getByRole('button',{name:'되돌리기',exact:true})).toBeDisabled();
+  await page.locator('#dock-1 [data-field="status"]').selectOption('Ready to drop');await page.locator('#confirm-action').click();
+  await page.reload();await page.getByRole('button',{name:'되돌리기',exact:true}).click();
+  for(const [field,value] of [['container','DEMO-A'],['codes','DEMO-I'],['contents','demo cargo'],['note','demo note'],['status','Full']])await expect(page.locator('#dock-1 [data-field="'+field+'"]')).toHaveValue(value);
+  await page.getByRole('button',{name:'다시 실행',exact:true}).click();await expect(page.locator('#dock-1 [data-field="container"]')).toHaveValue('');
+  await expect(page.locator('#dock-1 [data-field="status"]')).toHaveValue('Ready to drop');
+  await page.getByRole('button',{name:'되돌리기',exact:true}).click();await page.screenshot({path:'test-results/06-undo.png'});
+});
+test('container replacement is one undo step including dependent codes and status',async({page})=>{
+  await start(page);await container(page,'DEMO-A');await page.locator('#dock-1 [data-field="codes"]').fill('DEMO-I');await page.locator('#dock-1 [data-field="status"]').selectOption('Full');
+  await page.getByRole('button',{name:'저장 · 점검 보기'}).click();await next(page,'09:30');
+  await container(page,'DEMO-B');await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('');
+  await page.getByRole('button',{name:'되돌리기',exact:true}).click();
+  await expect(page.locator('#dock-1 [data-field="container"]')).toHaveValue('DEMO-A');await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('DEMO-I');await expect(page.locator('#dock-1 [data-field="status"]')).toHaveValue('Full');
+  await page.getByRole('button',{name:'다시 실행',exact:true}).click();await expect(page.locator('#dock-1 [data-field="container"]')).toHaveValue('DEMO-B');await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('');
+});
+test('keyboard undo groups typing, supports redo, and saving resets editing history',async({page})=>{
+  await start(page);const note=page.locator('#dock-1 [data-field="note"]');
+  await note.pressSequentially('DEMO NOTE');await page.keyboard.press('Control+z');await expect(note).toHaveValue('');
+  await page.keyboard.press('Control+Shift+z');await expect(note).toHaveValue('DEMO NOTE');
+  await page.keyboard.press('Control+z');await note.fill('NEW NOTE');await expect(page.getByRole('button',{name:'다시 실행',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'저장 · 점검 보기'}).click();await page.getByRole('button',{name:'수정',exact:true}).click();
+  await expect(page.getByRole('button',{name:'되돌리기',exact:true})).toBeDisabled();await expect(note).toHaveValue('NEW NOTE');
+});

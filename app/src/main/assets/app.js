@@ -4,6 +4,28 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 let state, screen='record', selected=null, editing=false, onlyChanged=false, settingsDraft, brokenRaw=null;
 let toastTimer;
 let readRange='all';
+let undoGroup=null;
+function updateUndoButtons(){
+  const undo=$('[data-action="undo"]'),redo=$('[data-action="redo"]');
+  if(undo)undo.disabled=!state.draft?.undoHistory?.length;
+  if(redo)redo.disabled=!state.draft?.redoHistory?.length;
+}
+function remember(group=null){
+  const key=group?state.draft.id+':'+group:null;
+  C.rememberEdit(state.draft,!!key&&key===undoGroup);undoGroup=key;updateUndoButtons();
+}
+function undoEdit(redo=false){
+  if(!editing||screen!=='record'||!state.draft||$('#dialog').open)return;
+  Object.keys(state.draft.pendingContainers||{}).forEach(n=>finishContainer(Number(n)));
+  const before=C.clone(state.draft),scroll=window.scrollY,focused=document.activeElement;
+  const focus=focused?.dataset.field?{dock:focused.dataset.dock,field:focused.dataset.field,index:focused.dataset.index}:null;
+  if(!C.travelEdit(state.draft,redo))return;
+  undoGroup=null;
+  if(!persist()){state.draft=before;updateUndoButtons();return;}
+  render();
+  if(focus){const target=$(`[data-dock="${focus.dock}"][data-field="${focus.field}"]${focus.index===undefined?'':`[data-index="${focus.index}"]`}`);if(target&&!target.disabled)target.focus({preventScroll:true});}
+  window.scrollTo(0,scroll);toast(redo?'다시 실행했습니다.':'한 단계 되돌렸습니다.');
+}
 function toast(message){$('#toast').textContent=message;$('#toast').style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').style.display='none',3500);}
 function persist(){
   try {
@@ -41,7 +63,7 @@ function editSchedule(){
     try{
       const date=$('#new-date').value,time=$('#new-time').value;
       C.newRecord(state,date,time);
-      const old={date:r.date,time:r.time};r.date=date;r.time=time;
+      const old={date:r.date,time:r.time};if(date!==r.date||time!==r.time)remember();r.date=date;r.time=time;
       if(!persist()){Object.assign(r,old);return;}
       closeDialog();render();
     }catch(e){$('#new-error').textContent=e.message;}
@@ -62,7 +84,8 @@ function render(){
   const latest=state.records[state.records.length-1];
   const options=state.records.map(x=>`<option value="${esc(x.id)}" ${x.id===r.id?'selected':''}>${esc(x.date)} · ${esc(x.time)}</option>`).join('')+(state.draft&&!state.draft.editOf?`<option value="draft" ${editing?'selected':''}>${state.draft.date} · ${state.draft.time} 작성 중</option>`:'');
   $('#app').innerHTML=`<section class="intro check-intro"><div class="row between"><h1>${esc(r.time)}</h1><span class="pill">${editing?(r.editOf?'기록 수정 중':'작성 중'):r.id===latest?.id?'최신 점검':'지난 점검'}</span><span class="pill yellow" id="change-count">${changed}곳 변경</span></div><label class="record-picker">점검 선택<select id="record-switch" aria-label="점검 선택">${options}</select></label>${editing?`<div class="edit-tools">${!r.editOf?'<button class="link" data-action="schedule">날짜·점검 시간 수정</button>':''}<button class="link danger" data-action="discard">${r.editOf?'수정 취소':'다음 점검 취소'}</button><span id="save-status" class="autosave">기기에 임시 저장됨</span></div>${r.editOf&&r.id!==latest?.id?'<p class="smallprint">이 기록만 수정합니다. 이후 점검의 값과 당시 비교 기준은 유지됩니다.</p>':''}`:`<div class="toolbar"><button data-action="filter" class="toggle ${onlyChanged?'active':''}">${onlyChanged?'전체 변경':'변경만'}</button><button data-action="copy">전체 복사</button><button data-action="text">텍스트 저장</button>${r.id===latest?.id&&!state.draft?'<button class="danger" data-action="delete-check">점검 삭제</button>':''}</div><nav class="ranges" aria-label="Dock 구간">${[['all','전체'],['1-8','1–8'],['9-13','9–13'],['14-20','14–20']].map(([value,label])=>`<button data-action="range" data-range="${value}" class="${readRange===value?'active':''}">${label}</button>`).join('')}</nav>`}</section><div id="dock-list">${r.groups.map(g=>groupHtml(r,g)).join('')}</div>${onlyChanged&&!changed?'<p class="notice">변경된 내용이 없습니다.</p>':''}`;
-  $('#bottom').innerHTML=`<div class="footer"><div class="footer-inner">${editing?'<button class="primary" data-action="save">저장 · 점검 보기</button>':`<button data-action="edit">수정</button><button class="primary" data-action="next">${state.draft?'작성 중인 점검 이어서 →':'다음 점검 →'}</button>`}</div></div>`;
+  $('#bottom').innerHTML=`<div class="footer"><div class="footer-inner">${editing?'<button class="undo-button" data-action="undo" aria-label="되돌리기">↶ 되돌리기</button><button class="undo-button" data-action="redo" aria-label="다시 실행" title="다시 실행">↷</button><button class="primary" data-action="save">저장 · 점검 보기</button>':`<button data-action="edit">수정</button><button class="primary" data-action="next">${state.draft?'작성 중인 점검 이어서 →':'다음 점검 →'}</button>`}</div></div>`;
+  updateUndoButtons();
 
 }
 function groupHtml(r,g){
@@ -120,13 +143,13 @@ function saveCheck(){
   Object.keys(state.draft.pendingContainers||{}).forEach(n=>finishContainer(Number(n)));
   const snapshot=C.clone(state),r=state.draft;r.savedAt=new Date().toISOString();
   const index=r.editOf?state.records.findIndex(x=>x.id===r.editOf):-1;
-  delete r.editOf;delete r.pendingContainers;delete r.containerUndo;
+  delete r.editOf;delete r.pendingContainers;delete r.containerUndo;delete r.undoHistory;delete r.redoHistory;undoGroup=null;
   if(index>=0)state.records[index]=r;else state.records.push(r);state.draft=null;
   if(!persist()){state=snapshot;return;}
   selected=r.id;editing=false;onlyChanged=false;render();window.scrollTo(0,0);toast('저장했습니다.');
 }
 function menu(){
-  modal(`<h2>Dock Notes</h2><div class="menu-list"><button data-action="latest">최신 점검${state.draft?' / 작성 중':''}</button><button data-action="history">지난 점검 기록</button><button data-action="settings">점검 시간 · 구역 설정</button><button data-action="backup">전체 기록 백업 (JSON)</button><button data-action="restore">백업 복원</button><button data-action="all-text">모든 기록 텍스트 저장</button><button data-action="close">닫기</button></div><p class="smallprint">v0.2.0 · 오프라인 개인 기록장<br>실제 기록은 GitHub에 전송하지 않습니다.<br>앱 삭제 전에는 전체 백업을 저장해 주세요.</p>`);
+  modal(`<h2>Dock Notes</h2><div class="menu-list"><button data-action="latest">최신 점검${state.draft?' / 작성 중':''}</button><button data-action="history">지난 점검 기록</button><button data-action="settings">점검 시간 · 구역 설정</button><button data-action="backup">전체 기록 백업 (JSON)</button><button data-action="restore">백업 복원</button><button data-action="all-text">모든 기록 텍스트 저장</button><button data-action="close">닫기</button></div><p class="smallprint">v0.2.1 · 오프라인 개인 기록장<br>실제 기록은 GitHub에 전송하지 않습니다.<br>앱 삭제 전에는 전체 백업을 저장해 주세요.</p>`);
 }
 function renderHistory(){
   $('#app').innerHTML=`<div class="eyebrow">HISTORY</div><h1>지난 점검</h1><p class="muted">${state.records.length}개 기록 · 이전 점검과의 변경 표시를 보존합니다.</p><button data-action="latest">← 최신 점검</button>${state.records.slice().reverse().map(r=>`<button class="history-item" data-action="record" data-id="${esc(r.id)}">${esc(r.date)} · ${esc(r.time)}<small>${r.rows.filter(row=>change(r,row).fields.length).length}곳 변경 · 기록 보기</small></button>`).join('')||'<p class="muted">저장한 점검이 없습니다.</p>'}`;
@@ -157,6 +180,8 @@ window.handleBack=()=>{if($('#dialog').open){closeDialog();return;}if(screen==='
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-action]');if(!b)return;const action=b.dataset.action,n=Number(b.dataset.dock);
   if(action==='close'){closeDialog();return;}
+  if(action==='undo'){undoEdit();return;}
+  if(action==='redo'){undoEdit(true);return;}
   if(action==='next'){openNew();return;}
   if(action==='schedule'){editSchedule();return;}
   if(action==='save'){saveCheck();return;}
@@ -164,6 +189,7 @@ document.addEventListener('click',e=>{
   if(action==='range'){readRange=b.dataset.range;render();return;}
   if(action==='discard'){discardDraft();return;}
   if(action==='number-correction'){
+    remember();
     const draft=state.draft,old=draft.containerUndo[n],number=draft.rows[n-1].container;
     Object.assign(draft.rows[n-1],old,{container:number});delete draft.containerUndo[n];
     if(!draft.corrections.includes(n))draft.corrections.push(n);persist();refreshRow(n);return;
@@ -176,7 +202,7 @@ document.addEventListener('click',e=>{
   if(action==='copy'){copyRecord();return;}
   if(action==='text'){download(`dock-${current().date}-${current().time.replace(':','')}.txt`,'text/plain',C.text(current()));return;}
   if(action==='edit'){editSaved();return;}
-  if(action==='add-code'||action==='remove-code'){const row=state.draft.rows[n-1];if(action==='add-code'&&row.codes.length<3)row.codes.push('');else if(action==='remove-code'&&row.codes.length>1)row.codes.splice(Number(b.dataset.index),1);persist();refreshRow(n);return;}
+  if(action==='add-code'||action==='remove-code'){const row=state.draft.rows[n-1];remember();if(action==='add-code'&&row.codes.length<3)row.codes.push('');else if(action==='remove-code'&&row.codes.length>1)row.codes.splice(Number(b.dataset.index),1);persist();refreshRow(n);return;}
   if(action==='latest'){closeDialog();screen='record';selected=null;editing=!!state.draft;onlyChanged=false;render();window.scrollTo(0,0);return;}
   if(action==='record'){selected=b.dataset.id;editing=false;screen='record';onlyChanged=false;render();window.scrollTo(0,0);return;}
   if(action==='history'){closeDialog();screen='history';render();window.scrollTo(0,0);return;}
@@ -194,6 +220,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('input',e=>{
   const el=e.target,key=el.dataset.field;if(!key||key==='status'||!editing)return;
   const n=Number(el.dataset.dock),row=state.draft.rows[n-1];
+  remember(n+':'+key+':'+(el.dataset.index||''));
   if(key==='container'){
     state.draft.pendingContainers=state.draft.pendingContainers||{};
     if(!state.draft.pendingContainers[n])state.draft.pendingContainers[n]=C.clone(row);
@@ -201,7 +228,11 @@ document.addEventListener('input',e=>{
   }else if(key==='codes')row.codes[Number(el.dataset.index)]=el.value;else row[key]=el.value;
   persist();refreshMark(n);
 });
-document.addEventListener('focusout',e=>{if(e.target.dataset.field==='container'&&editing)finishContainer(Number(e.target.dataset.dock));});
+document.addEventListener('focusout',e=>{if(e.target.dataset.field==='container'&&editing)finishContainer(Number(e.target.dataset.dock));if(e.target.dataset.field)undoGroup=null;});
+document.addEventListener('keydown',e=>{
+  if(!editing||screen!=='record'||$('#dialog').open||!(e.ctrlKey||e.metaKey)||e.altKey||e.isComposing)return;
+  const key=e.key.toLowerCase();if(key==='z'||key==='y'){e.preventDefault();undoEdit(key==='y'||e.shiftKey);}
+});
 document.addEventListener('change',e=>{
   if(e.target.id==='record-switch'){
     selected=e.target.value==='draft'?null:e.target.value;editing=e.target.value==='draft'||state.draft?.editOf===selected;onlyChanged=false;render();return;
@@ -210,8 +241,8 @@ document.addEventListener('change',e=>{
   const n=Number(el.dataset.dock),row=state.draft.rows[n-1],value=el.value;
   if(value==='Ready to drop'&&(row.container||row.contents||row.codes.some(Boolean)||row.note)){
     el.value=row.status;
-    confirmAction('컨테이너가 나갔나요?','현재 점검의 번호·아이템 코드·내용물·메모를 비웁니다. 이전 점검 기록은 유지됩니다.','컨테이너 없음',()=>{Object.assign(row,{container:'',codes:[''],contents:'',note:'',status:value});persist();refreshRow(n);});
-  }else{row.status=value;persist();refreshRow(n);}
+    confirmAction('컨테이너가 나갔나요?','현재 점검의 번호·아이템 코드·내용물·메모를 비웁니다. 이전 점검 기록은 유지됩니다.','컨테이너 없음',()=>{remember();Object.assign(row,{container:'',codes:[''],contents:'',note:'',status:value});if(state.draft.containerUndo)delete state.draft.containerUndo[n];if(state.draft.pendingContainers)delete state.draft.pendingContainers[n];persist();refreshRow(n);});
+  }else{if(row.status!==value)remember();row.status=value;persist();refreshRow(n);}
 });
 $('#menu').onclick=menu;
 $('#import-file').onchange=async e=>{const file=e.target.files[0];if(file){if(file.size>20*1024*1024)toast('백업은 20MB 이하여야 합니다.');else window.receiveBackup(await file.text());}e.target.value='';};
