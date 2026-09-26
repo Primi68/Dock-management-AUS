@@ -1,0 +1,11 @@
+{
+  "name": "dock-notes-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/core.test.js",
+    "test:ui": "playwright test",
+    "preview": "node tests/serve.js"
+  },
+  "devDependencies": { "@playwright/test": "1.56.1" }
+}

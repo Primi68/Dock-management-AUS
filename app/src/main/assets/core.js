@@ -1,0 +1,113 @@
+(function(root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.DockCore = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function() {
+  'use strict';
+  const clone = value => JSON.parse(JSON.stringify(value));
+  const pad = n => String(n).padStart(2, '0');
+  const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const validDate = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && dateKey(new Date(s+'T12:00:00')) === s;
+  const validTime = s => typeof s === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$|^24:00$/.test(s);
+  const minutes = s => Number(s.slice(0,2))*60 + Number(s.slice(3));
+  const statuses = ['', 'Full', 'In process', 'Empty', 'Ready to drop'];
+  const blankRow = n => ({dock:n, container:'', codes:[''], contents:'', status:'', note:''});
+  const defaults = () => ({
+    times:['07:30','09:30','11:30','13:30','15:30'], days:[1,2,3,4,5],
+    groups:[{name:'Tires',start:1,end:8},{name:'Dunnage',start:9,end:12},{name:'쓰레기',start:13,end:13},{name:'Wheels',start:14,end:20}]
+  });
+  const initial = () => ({schema:1, settings:defaults(), records:[], draft:null});
+  const normalized = s => s.trim().replace(/\s+/g,' ').toUpperCase();
+  function diff(row, before, correction) {
+    if (!before) before = blankRow(row.dock);
+    const containerChanged = normalized(row.container) !== normalized(before.container);
+    const arrival = containerChanged && !!row.container.trim() && !correction;
+    const departure = before.status !== 'Ready to drop' && row.status === 'Ready to drop' && (!!before.container || !!before.status);
+    const fields = ['container','contents','status','note'].filter(k => row[k].trim() !== before[k].trim());
+    if (row.codes.map(normalized).filter(Boolean).join('|') !== before.codes.map(normalized).filter(Boolean).join('|')) fields.push('codes');
+    return {whole:arrival || departure, label:arrival?'새 컨테이너':departure?'컨테이너 없음':'항목 변경', fields};
+  }
+  // Start the upcoming slot 15 minutes early. Between windows keep the current
+  // slot (late checks); if it already exists, advance to the next unrecorded slot.
+  // 24:00 belongs to the preceding work date, even after midnight.
+  function suggest(now, settings, records) {
+    const slots=[];
+    for (let offset=-1; offset<=15; offset++) {
+      const day=new Date(now.getFullYear(),now.getMonth(),now.getDate()+offset,12);
+      if (!settings.days.includes(day.getDay())) continue;
+      for (const time of settings.times) {
+        const at=new Date(day.getFullYear(),day.getMonth(),day.getDate(),0,0);
+        at.setMinutes(minutes(time));
+        slots.push({date:dateKey(day),time,at:at.getTime(),open:at.getTime()-15*60000});
+      }
+    }
+    slots.sort((a,b)=>a.at-b.at);
+    let candidates=slots.filter(s=>s.date===dateKey(now) || (s.time==='24:00' && now.getTime()>=s.open && now.getTime()<=s.at+30*60000));
+    const opened=candidates.filter(s=>s.open<=now.getTime());
+    let selected=opened.length?opened[opened.length-1]:candidates[0];
+    if (!selected) selected=slots.find(s=>s.at>=now.getTime());
+    const exists=s=>records.some(r=>r.date===s.date && r.time===s.time);
+    if (selected && exists(selected)) selected=slots.find(s=>s.at>selected.at && !exists(s));
+    if (!selected) throw new Error('점검 시간표를 확인해 주세요.');
+    return {date:selected.date,time:selected.time};
+  }
+  function newRecord(state, date, time) {
+    if (!validDate(date) || !validTime(time)) throw new Error('날짜와 점검 시간을 확인해 주세요.');
+    if (state.records.some(r=>r.date===date && r.time===time)) throw new Error('같은 날짜와 시간의 기록이 이미 있습니다.');
+    const latest=state.records[state.records.length-1];
+    if (latest && `${date} ${time}` <= `${latest.date} ${latest.time}`) throw new Error('최근 점검 이후의 시간을 선택해 주세요.');
+    return {
+      id:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),date,time,
+      createdAt:new Date().toISOString(),savedAt:null,
+      groups:clone(state.settings.groups), rows:latest?clone(latest.rows):Array.from({length:20},(_,i)=>blankRow(i+1)),
+      baseline:latest?clone(latest.rows):null, corrections:[]
+    };
+  }
+  function text(record) {
+    let lines=[`${record.date} · ${record.time}${record.time==='24:00'?' (close)':''}`,''];
+    for (const group of record.groups) {
+      lines.push(`${group.name} · Dock ${group.start}${group.start!==group.end?'~'+group.end:''}`);
+      for (const row of record.rows.filter(r=>r.dock>=group.start && r.dock<=group.end)) {
+        const change=diff(row,record.baseline && record.baseline[row.dock-1],record.corrections.includes(row.dock));
+        const marker=change.fields.length?` [${change.whole?change.label:'변경: '+change.fields.map(f=>({container:'번호',codes:'코드',contents:'내용물',status:'상태',note:'메모'}[f])).join(', ')}]`:'';
+        lines.push([row.dock,row.container,row.codes.filter(Boolean).join(' / '),row.contents,row.status,row.note].filter(v=>v!=='').join(' ')+marker);
+      }
+      lines.push('');
+    }
+    return lines.join('\n');
+  }
+  function validateSettings(s) {
+    if (!s || !Array.isArray(s.times) || !s.times.length || s.times.length>24 || s.times.some(t=>!validTime(t)) || new Set(s.times).size!==s.times.length) throw new Error('중복 없는 점검 시간을 1~24개 입력해 주세요.');
+    if (!Array.isArray(s.days) || !s.days.length || s.days.some(d=>!Number.isInteger(d)||d<0||d>6) || new Set(s.days).size!==s.days.length) throw new Error('근무 요일을 선택해 주세요.');
+    if (!Array.isArray(s.groups) || !s.groups.length || s.groups.length>20) throw new Error('구역을 확인해 주세요.');
+    let next=1;
+    for (const g of s.groups) {
+      if (typeof g.name!=='string' || !g.name.trim() || g.name.length>80 || g.start!==next || !Number.isInteger(g.end) || g.end<g.start || g.end>20) throw new Error('구역 범위는 중복·누락 없이 Dock 1~20 순서여야 합니다.');
+      next=g.end+1;
+    }
+    if (next!==21) throw new Error('모든 Dock 1~20을 구역에 포함해 주세요.');
+  }
+  function validateRows(rows) {
+    if (!Array.isArray(rows) || rows.length!==20) throw new Error('Dock 데이터가 올바르지 않습니다.');
+    rows.forEach((r,i)=>{
+      if (!r || r.dock!==i+1 || ['container','contents','status','note'].some(k=>typeof r[k]!=='string'||r[k].length>2000) || !statuses.includes(r.status) || !Array.isArray(r.codes) || r.codes.length<1 || r.codes.length>3 || r.codes.some(c=>typeof c!=='string'||c.length>200) || (r.status==='Ready to drop' && (r.container || r.contents || r.codes.some(Boolean)))) throw new Error('Dock 항목이 올바르지 않습니다.');
+    });
+  }
+  function parseBackup(raw) {
+    if (raw.length>20*1024*1024) throw new Error('백업 파일이 너무 큽니다.');
+    const s=JSON.parse(raw);
+    if (!s || s.schema!==1 || !Array.isArray(s.records) || s.records.length>10000 || !(s.draft===null || typeof s.draft==='object')) throw new Error('지원하지 않는 백업 형식입니다.');
+    validateSettings(s.settings);
+    const ids=new Set(), slots=new Set(); let prior='';
+    for (const r of [...s.records,...(s.draft?[s.draft]:[])]) {
+      if (!r || typeof r.id!=='string' || !r.id || ids.has(r.id) || !validDate(r.date) || !validTime(r.time) || !Array.isArray(r.corrections) || r.corrections.some(n=>!Number.isInteger(n)||n<1||n>20)) throw new Error('점검 기록이 올바르지 않습니다.');
+      const slot=`${r.date} ${r.time}`;
+      if (slots.has(slot) || (prior && slot<=prior)) throw new Error('점검 날짜 순서 또는 중복을 확인해 주세요.');
+      prior=slot; ids.add(r.id); slots.add(slot);
+      validateRows(r.rows); if(r.baseline!==null) validateRows(r.baseline);
+      validateSettings({...s.settings,groups:r.groups});
+    }
+    return s;
+  }
+  return {clone,dateKey,validDate,validTime,minutes,statuses,blankRow,defaults,initial,normalized,diff,suggest,newRecord,text,validateSettings,parseBackup};
+});
