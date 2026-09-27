@@ -10,3 +10,5 @@ main{padding:12px 12px 90px}.check-intro{margin-bottom:10px}.check-intro h1{font
 .fields{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 .fields input,.fields select,.code-row input{min-width:0}
 .group-edit{grid-template-columns:minmax(0,1fr) 62px 62px 44px}
+
+.jump-bottom{display:flex;justify-content:center;margin:8px 0 0}.jump-bottom button{min-width:48px;min-height:46px;font-size:24px;line-height:1;padding:6px 16px}

@@ -6,6 +6,7 @@
   'use strict';
   // Keys are the original Korean interface messages. Never translate user data.
   const english = {
+  "맨 아래로": "Go to bottom",
   "설정": "Settings",
   "언어 설정": "Language settings",
   "점검으로 돌아가기": "Back to check",
