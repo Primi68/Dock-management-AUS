@@ -6,6 +6,9 @@
   'use strict';
   // Keys are the original Korean interface messages. Never translate user data.
   const english = {
+  "설정": "Settings",
+  "언어 설정": "Language settings",
+  "점검으로 돌아가기": "Back to check",
   "다시 실행했습니다.": "Redone.",
   "한 단계 되돌렸습니다.": "Undone.",
   "저장 실패": "Save failed",
@@ -80,7 +83,7 @@
   "이전 점검 당시 값": "Values at the previous check",
   "저장했습니다.": "Saved.",
   "지난 점검 기록": "Check history",
-  "점검 시간 · 구역 설정": "Settings · Times, groups & language",
+  "점검 시간 · 구역 설정": "Check times and groups",
   "전체 기록 백업 (JSON)": "Back up all records (JSON)",
   "백업 복원": "Restore backup",
   "모든 기록 텍스트 저장": "Export all records as text",

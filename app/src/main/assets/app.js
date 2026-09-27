@@ -76,7 +76,8 @@ function render(){
   $('#menu').setAttribute('aria-label',t('설정 및 기록 메뉴'));
   if(native?.setLanguage)native.setLanguage(state.settings.language||'ko');
   $('#bottom').innerHTML='';
-  if(screen==='settings'){renderSettings();return;}
+  if(screen==='settings'){renderSettingsHome();return;}
+  if(screen==='language'||screen==='check-settings'){renderSettings();return;}
   if(screen==='history'){renderHistory();return;}
   if(screen==='broken'){renderBroken();return;}
   const r=current();
@@ -154,18 +155,23 @@ function saveCheck(){
   selected=r.id;editing=false;onlyChanged=false;render();window.scrollTo(0,0);toast(t("저장했습니다."));
 }
 function menu(){
-  modal(`<h2>Dock Notes</h2><div class="menu-list"><button data-action="latest">${t("최신 점검")}${state.draft?` / ${t("작성 중")}`:''}</button><button data-action="history">${t("지난 점검 기록")}</button><button data-action="settings">${t("점검 시간 · 구역 설정")}</button><button data-action="backup">${t("전체 기록 백업 (JSON)")}</button><button data-action="restore">${t("백업 복원")}</button><button data-action="all-text">${t("모든 기록 텍스트 저장")}</button><button data-action="close">${t("닫기")}</button></div><p class="smallprint">v0.3.0 · ${t("오프라인 개인 기록장")}<br>${t("실제 기록은 GitHub에 전송하지 않습니다.")}<br>${t("앱 삭제 전에는 전체 백업을 저장해 주세요.")}</p>`);
+  modal(`<h2>Dock Notes</h2><div class="menu-list"><button data-action="latest">${t("최신 점검")}${state.draft?` / ${t("작성 중")}`:''}</button><button data-action="history">${t("지난 점검 기록")}</button><button data-action="settings">${t("설정")}</button><button data-action="backup">${t("전체 기록 백업 (JSON)")}</button><button data-action="restore">${t("백업 복원")}</button><button data-action="all-text">${t("모든 기록 텍스트 저장")}</button><button data-action="close">${t("닫기")}</button></div><p class="smallprint">v0.3.1 · ${t("오프라인 개인 기록장")}<br>${t("실제 기록은 GitHub에 전송하지 않습니다.")}<br>${t("앱 삭제 전에는 전체 백업을 저장해 주세요.")}</p>`);
 }
 function renderHistory(){
   $('#app').innerHTML=`<div class="eyebrow">HISTORY</div><h1>${t("지난 점검")}</h1><p class="muted">${t('{count}개 기록 · 이전 점검과의 변경 표시를 보존합니다.',{count:state.records.length})}</p><button data-action="latest">← ${t("최신 점검")}</button>${state.records.slice().reverse().map(r=>`<button class="history-item" data-action="record" data-id="${esc(r.id)}">${esc(r.date)} · ${esc(r.time)}<small>${t('{count}곳 변경 · 기록 보기',{count:r.rows.filter(row=>change(r,row).fields.length).length})}</small></button>`).join('')||`<p class="muted">${t("저장한 점검이 없습니다.")}</p>`}`;
 }
+function renderSettingsHome(){
+  $('#app').innerHTML=`<h1>${t('설정')}</h1><div class="menu-list"><button data-action="language-settings">${t('언어 설정')}</button><button data-action="check-settings">${t('점검 시간 · 구역 설정')}</button></div>`;
+  $('#bottom').innerHTML=`<div class="footer"><div class="footer-inner"><button class="wide" data-action="leave-settings">← ${t('점검으로 돌아가기')}</button></div></div>`;
+}
 function renderSettings(){
   if(!settingsDraft)settingsDraft=C.clone(state.settings);
-  $('#app').innerHTML=`<div class="eyebrow">PREFERENCES</div><h1>${t("내 점검 설정")}</h1><p class="muted">${t("변경한 설정은 다음에 만드는 점검부터 적용됩니다.")}</p><section class="settings-box"><label>${t('언어 / Language')}<select id="settings-language"><option value="ko" ${settingsDraft.language!=='en'?'selected':''}>한국어</option><option value="en" ${settingsDraft.language==='en'?'selected':''}>English</option></select></label><p class="smallprint">${t('화면 언어를 변경해도 직접 입력한 기록과 구역 제목은 유지됩니다.')}</p></section><section class="settings-box"><h2>${t("점검 시간")}</h2><label>${t("시간마다 줄을 나눠 입력")}<textarea id="settings-times" rows="6">${esc(settingsDraft.times.join('\n'))}</textarea></label><p class="smallprint">${t("예: 07:30 · 마감 점검은 24:00")}<br>${t("시작 15분 전부터 해당 점검 시간을 제안합니다.")}</p><div class="section-label">${t("근무 요일")}</div><div class="days">${[t("일"),t("월"),t("화"),t("수"),t("목"),t("금"),t("토")].map((d,i)=>`<label class="day"><input type="checkbox" data-day="${i}" ${settingsDraft.days.includes(i)?'checked':''}>${d}</label>`).join('')}</div></section><section class="settings-box"><h2>${t("구역 제목과 Dock 범위")}</h2><p class="smallprint">${t("제목 / 시작 번호 / 끝 번호")}<br>${t("Dock 1~20을 빠짐없이 순서대로 포함해 주세요.")}</p><div id="group-editors">${settingsDraft.groups.map((g,i)=>`<div class="group-edit"><input aria-label="${t('구역 {group} 이름',{group:i+1})}" data-group="${i}" data-key="name" value="${esc(g.name)}" maxlength="80"><input aria-label="${t('구역 {group} 시작 Dock',{group:i+1})}" data-group="${i}" data-key="start" type="number" min="1" max="20" value="${g.start}"><input aria-label="${t('구역 {group} 끝 Dock',{group:i+1})}" data-group="${i}" data-key="end" type="number" min="1" max="20" value="${g.end}"><button aria-label="${t('구역 {group} 삭제',{group:i+1})}" data-action="remove-group" data-index="${i}">−</button></div>`).join('')}</div><button data-action="add-group">${t("+ 구역 추가")}</button></section><p id="settings-error" class="danger" role="alert"></p><div class="notice">${t("Dunnage도 다른 Dock과 동일하게 불러옵니다. 별도 입력 제한이나 엑셀 시간 규칙은 없습니다.")}</div>`;
+  $('#app').innerHTML=`<div class="eyebrow">PREFERENCES</div><h1>${t("점검 시간 · 구역 설정")}</h1><p class="muted">${t("변경한 설정은 다음에 만드는 점검부터 적용됩니다.")}</p><section class="settings-box"><h2>${t("점검 시간")}</h2><label>${t("시간마다 줄을 나눠 입력")}<textarea id="settings-times" rows="6">${esc(settingsDraft.times.join('\n'))}</textarea></label><p class="smallprint">${t("예: 07:30 · 마감 점검은 24:00")}<br>${t("시작 15분 전부터 해당 점검 시간을 제안합니다.")}</p><div class="section-label">${t("근무 요일")}</div><div class="days">${[t("일"),t("월"),t("화"),t("수"),t("목"),t("금"),t("토")].map((d,i)=>`<label class="day"><input type="checkbox" data-day="${i}" ${settingsDraft.days.includes(i)?'checked':''}>${d}</label>`).join('')}</div></section><section class="settings-box"><h2>${t("구역 제목과 Dock 범위")}</h2><p class="smallprint">${t("제목 / 시작 번호 / 끝 번호")}<br>${t("Dock 1~20을 빠짐없이 순서대로 포함해 주세요.")}</p><div id="group-editors">${settingsDraft.groups.map((g,i)=>`<div class="group-edit"><input aria-label="${t('구역 {group} 이름',{group:i+1})}" data-group="${i}" data-key="name" value="${esc(g.name)}" maxlength="80"><input aria-label="${t('구역 {group} 시작 Dock',{group:i+1})}" data-group="${i}" data-key="start" type="number" min="1" max="20" value="${g.start}"><input aria-label="${t('구역 {group} 끝 Dock',{group:i+1})}" data-group="${i}" data-key="end" type="number" min="1" max="20" value="${g.end}"><button aria-label="${t('구역 {group} 삭제',{group:i+1})}" data-action="remove-group" data-index="${i}">−</button></div>`).join('')}</div><button data-action="add-group">${t("+ 구역 추가")}</button></section><p id="settings-error" class="danger" role="alert"></p><div class="notice">${t("Dunnage도 다른 Dock과 동일하게 불러옵니다. 별도 입력 제한이나 엑셀 시간 규칙은 없습니다.")}</div>`;
+  if(screen==='language')$('#app').innerHTML=`<h1>${t('언어 설정')}</h1><section class="settings-box"><label>${t('언어 / Language')}<select id="settings-language"><option value="ko" ${settingsDraft.language!=='en'?'selected':''}>한국어</option><option value="en" ${settingsDraft.language==='en'?'selected':''}>English</option></select></label><p class="smallprint">${t('화면 언어를 변경해도 직접 입력한 기록과 구역 제목은 유지됩니다.')}</p></section><p id="settings-error" class="danger" role="alert"></p>`;
   $('#bottom').innerHTML=`<div class="footer"><div class="footer-inner"><button data-action="cancel-settings">${t("취소")}</button><button class="primary" data-action="save-settings">${t("설정 저장")}</button></div></div>`;
 }
 function captureSettings(){
-  settingsDraft.language=$('#settings-language').value;
+  if(screen==='language'){settingsDraft.language=$('#settings-language').value;return;}
   settingsDraft.times=$('#settings-times').value.split(/[\n,]+/).map(t=>t.trim()).filter(Boolean);
   settingsDraft.days=[...document.querySelectorAll('[data-day]:checked')].map(e=>Number(e.dataset.day));
   document.querySelectorAll('[data-group]').forEach(e=>settingsDraft.groups[Number(e.dataset.group)][e.dataset.key]=e.dataset.key==='name'?e.value:Number(e.value));
@@ -182,7 +188,7 @@ window.receiveBackup=raw=>{
     });
   }catch(e){toast(t("복원하지 않았습니다: ")+t(e.message));}
 };
-window.handleBack=()=>{if($('#dialog').open){closeDialog();return;}if(screen==='settings'){confirmAction(t("설정을 닫을까요?"),t("저장하지 않은 설정 변경은 취소됩니다."),t("닫기"),()=>{settingsDraft=null;screen='record';render();});return;}if(screen!=='broken'){screen='record';selected=null;editing=!!state.draft;onlyChanged=false;render();toast(editing?t("작성 내용은 임시 저장되어 있습니다."):t("최신 점검입니다."));}};
+window.handleBack=()=>{if($('#dialog').open){closeDialog();return;}if(screen==='language'||screen==='check-settings'){confirmAction(t("설정을 닫을까요?"),t("저장하지 않은 설정 변경은 취소됩니다."),t("닫기"),()=>{settingsDraft=null;screen='settings';render();});return;}if(screen==='settings'){screen='record';render();return;}if(screen!=='broken'){screen='record';selected=null;editing=!!state.draft;onlyChanged=false;render();toast(editing?t("작성 내용은 임시 저장되어 있습니다."):t("최신 점검입니다."));}};
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-action]');if(!b)return;const action=b.dataset.action,n=Number(b.dataset.dock);
   if(action==='close'){closeDialog();return;}
@@ -213,7 +219,9 @@ document.addEventListener('click',e=>{
   if(action==='record'){selected=b.dataset.id;editing=false;screen='record';onlyChanged=false;render();window.scrollTo(0,0);return;}
   if(action==='history'){closeDialog();screen='history';render();window.scrollTo(0,0);return;}
   if(action==='settings'){closeDialog();screen='settings';settingsDraft=null;render();window.scrollTo(0,0);return;}
-  if(action==='cancel-settings'){settingsDraft=null;screen='record';render();return;}
+  if(action==='language-settings'||action==='check-settings'){screen=action==='language-settings'?'language':'check-settings';settingsDraft=null;render();window.scrollTo(0,0);return;}
+  if(action==='leave-settings'){screen='record';render();return;}
+  if(action==='cancel-settings'){settingsDraft=null;screen='settings';render();return;}
   if(action==='add-group'||action==='remove-group'){captureSettings();if(action==='add-group'&&settingsDraft.groups.length<20)settingsDraft.groups.push({name:t("새 구역"),start:20,end:20});else if(action==='remove-group')settingsDraft.groups.splice(Number(b.dataset.index),1);renderSettings();return;}
   if(action==='save-settings'){
     captureSettings();try{C.validateSettings(settingsDraft);settingsDraft.times.sort((a,b)=>C.minutes(a)-C.minutes(b));const old=state.settings;state.settings=C.clone(settingsDraft);if(!persist()){state.settings=old;return;}settingsDraft=null;screen='record';render();toast(t("설정을 저장했습니다"));}catch(err){$('#settings-error').textContent=t(err.message);}return;

@@ -1,6 +1,6 @@
 const {test,expect}=require('@playwright/test');
 
-async function settings(page){await page.locator('#menu').click();await page.locator('[data-action="settings"]').click();}
+async function settings(page,section='language-settings'){await page.locator('#menu').click();await page.getByRole('button',{name:/^(설정|Settings)$/}).click();await page.locator('[data-action="'+section+'"]').click();}
 async function language(page,value){await settings(page);await page.locator('#settings-language').selectOption(value);await page.locator('[data-action="save-settings"]').click();}
 
 test('English setting persists, restores from backup and preserves user text, drafts and undo history',async({page})=>{
@@ -46,13 +46,16 @@ test('English schedule, validation, departure confirmation, exports and settings
   const download=await downloadPromise;const content=require('fs').readFileSync(await download.path(),'utf8');
   expect(content).toContain('DEMO-EN 메모 [New container]');
   await page.evaluate(()=>window.receiveBackup('{broken'));await expect(page.locator('#toast')).toHaveText('Not restored: The backup is not valid JSON.');
-  await settings(page);await page.locator('#settings-times').fill('invalid');await page.getByRole('button',{name:'Save settings'}).click();
+  await settings(page,'check-settings');await expect(page.locator('#settings-language')).toHaveCount(0);await page.locator('#settings-times').fill('invalid');await page.getByRole('button',{name:'Save settings'}).click();
   await expect(page.locator('#settings-error')).toHaveText('Enter 1–24 different valid check times.');
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Settings',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Language settings',exact:true}).click();await expect(page.locator('#settings-times')).toHaveCount(0);
   await page.locator('#settings-language').selectOption('ko');await page.getByRole('button',{name:'Cancel',exact:true}).click();await expect(page.locator('html')).toHaveAttribute('lang','en');
   await settings(page);await expect(page.locator('#settings-language')).toHaveValue('en');
   await page.locator('#toast').waitFor({state:'hidden'});
   await page.screenshot({path:'test-results/07-english-settings.png'});
-  await page.getByRole('button',{name:'Cancel',exact:true}).click();await page.getByRole('button',{name:'Edit',exact:true}).click();
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();await page.locator('[data-action="leave-settings"]').click();await page.getByRole('button',{name:'Edit',exact:true}).click();
   await page.screenshot({path:'test-results/08-english-editing.png'});
   await page.setViewportSize({width:320,height:700});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });
@@ -97,7 +100,7 @@ test('editable settings, header isolation, backups and history',async({page})=>{
   await page.locator('#dock-1 [data-action="add-code"]').click();await page.locator('#dock-1 [data-action="add-code"]').click();await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveCount(3);
   await page.getByRole('button',{name:'저장 · 점검 보기'}).click();
   const backup=await page.evaluate(()=>localStorage.getItem('dock-notes-v1'));
-  await page.locator('#menu').click();await page.getByRole('button',{name:'점검 시간 · 구역 설정'}).click();
+  await settings(page,'check-settings');
   await page.locator('[data-group="0"][data-key="name"]').fill('Tires / revised');
   await page.locator('#settings-times').fill('07:30\n09:30\n11:30\n13:30\n15:30\n24:00');await page.getByRole('button',{name:'설정 저장'}).click();
   await expect(page.getByRole('heading',{name:'Tires',exact:true})).toBeVisible();

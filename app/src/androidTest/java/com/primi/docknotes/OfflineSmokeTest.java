@@ -41,7 +41,7 @@ public class OfflineSmokeTest {
             scenario.recreate();waitForPage(scenario);
             assertEquals("true",evaluate(scenario,"document.querySelector('#dock-1 [data-field=container]').value==='DEMO-ANDROID' && document.querySelectorAll('.dock').length===20"));
             assertEquals("true",evaluate(scenario,"DockCore.parseBackup(DockNative.load()).draft.rows[0].status==='Full'"));
-            assertEquals("true",evaluate(scenario,"(function(){document.querySelector('#menu').click();document.querySelector('[data-action=settings]').click();document.querySelector('#settings-language').value='en';document.querySelector('[data-action=save-settings]').click();return document.documentElement.lang==='en';})()"));
+            assertEquals("true",evaluate(scenario,"(function(){document.querySelector('#menu').click();document.querySelector('[data-action=settings]').click();document.querySelector('[data-action=language-settings]').click();document.querySelector('#settings-language').value='en';document.querySelector('[data-action=save-settings]').click();return document.documentElement.lang==='en';})()"));
             scenario.recreate();waitForPage(scenario);
             assertEquals("true",evaluate(scenario,"document.documentElement.lang==='en' && document.querySelector('[data-action=save]').textContent==='Save · View check' && document.querySelector('#dock-1 [data-field=container]').value==='DEMO-ANDROID'"));
             assertEquals("true",evaluate(scenario,"DockCore.parseBackup(DockNative.load()).settings.language==='en' && typeof DockNative.setLanguage==='function'"));
