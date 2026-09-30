@@ -25,4 +25,14 @@ JDK 17 / Android SDK Platform 35 및 Build Tools 35.0.0 / Gradle 8.11.1 / Node 2
 
 작업 단위가 완료될 때마다 코드를 commit/push합니다. 설명 문서는 요청된 수정과 최종 검증을 마친 시점에 함께 갱신하고, APK도 최종 버전으로 한 번만 빌드·배포합니다. 중간 코드 push마다 APK를 재배포하지 않습니다.
 
-업데이트에는 versionCode 증가와 백업 스키마 호환성 유지가 필요합니다. 실제 자료를 테스트 fixture로 쓰지 않습니다. 장기 배포 전 서명 키를 안전하게 관리해야 하며 서명 변경 시 백업·복원 절차를 지킵니다. 현재는 개발용 미리보기 서명입니다.
+업데이트에는 versionCode 증가와 백업 스키마 호환성 유지가 필요합니다. 실제 자료를 테스트 fixture로 쓰지 않습니다. 0.3.4부터 GitHub 미리보기도 고정된 키의 release APK입니다. debug APK는 개발 확인용이며 배포하지 않습니다. 서명 키가 없을 때 임시 키를 생성하거나 debug APK로 대신 배포하지 않습니다.
+
+## 고정 서명
+
+GitHub Actions 저장소 비밀 설정 `DOCK_RELEASE_KEYSTORE_BASE64`와 `DOCK_RELEASE_KEYSTORE_PASSWORD`에 기존 키를 보관합니다. CI는 제한된 임시 파일로 복원하고 작업 종료 시 삭제합니다. 키와 비밀번호는 소스·로그·릴리스 첨부에 넣지 않습니다. 저장소에는 공개 정보인 `.github/release-certificate.sha256`만 두고 APK의 인증서 지문이 일치해야 배포합니다. 지문 오류를 피하려고 새 키를 생성하거나 기준 지문을 바꾸면 안 됩니다.
+
+로컬 배포 빌드는 기존 키의 경로를 `DOCK_RELEASE_STORE_FILE`, 비밀번호를 `DOCK_RELEASE_STORE_PASSWORD` 환경 변수에 설정한 뒤 `./gradlew :app:assembleRelease :app:lintRelease`로 실행합니다. alias는 `dock-notes`이며 PKCS12 저장소와 키의 비밀번호가 같습니다. 비밀번호를 명령 인수·기록·프로젝트 파일에 직접 적지 않습니다. Android 테스트는 `-PdockTestBuildType=release :app:connectedReleaseAndroidTest`로 배포용 빌드에도 실행할 수 있습니다.
+
+회사 또는 다른 GitHub 저장소로 옮길 때도 같은 키·비밀번호를 새 저장소의 비밀 설정으로 복사하고 applicationId를 유지합니다. GitHub 비밀 설정 값은 다시 읽는 용도의 백업이 아니므로 원본 키와 비밀번호를 별도로 안전하게 보관해야 합니다. 이 PC의 비밀번호 로컬 사본은 Windows DPAPI로 보호되어 다른 PC에서 파일만 복사해서는 해독할 수 없습니다. PC를 교체하기 전에 같은 Windows 계정에서 복구해 비밀번호 관리자 등에 옮기고, 암호화된 키 파일도 별도 보관하세요. 키를 잃어버렸다고 자동 재생성하지 않습니다.
+
+기술 근거: [Android 앱 서명](https://developer.android.com/studio/publish/app-signing), [GitHub Actions 비밀 설정](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets).

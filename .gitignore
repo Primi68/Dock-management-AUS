@@ -5,6 +5,10 @@ local.properties
 *.iml
 *.jks
 *.keystore
+*.p12
+*.pfx
+signing-credentials.json
+signing.properties
 *.apk
 *.aab
 node_modules/

@@ -12,6 +12,7 @@
 - 자동 임시 저장, 이력, 텍스트 복사·내보내기, JSON 백업·복원.
 - 아이템 코드 최대 3개. 엑셀/WMS 자동 연동 없음.
 - 모든 Dock에서 코드 먼저, 번호 나중에 입력 가능. 번호 변경은 입력 내용을 유지하며, 내용 초기화는 확인 후 실행.
+- 0.3.4부터 고정 키로 서명한 배포용 APK를 제공합니다. 이후 같은 키의 새 버전은 기록을 유지하며 업데이트할 수 있습니다.
 
 [APK Releases](https://github.com/Primi68/Dock-management-AUS/releases) · [제품 명세](docs/SPEC.md) · [설치 안내](docs/INSTALL.md) · [개발 이어가기](docs/DEVELOPMENT.md) · [데이터 원칙](docs/PRIVACY.md) · [검증](docs/VERIFICATION.md)
 
