@@ -36,12 +36,13 @@ public class SignedUpdateTest {
         assumeTrue("before".equals(InstrumentationRegistry.getArguments().getString("upgradePhase")));
         String data = readStoredData();
         assertTrue("Seeded data present", data.contains("DEMO-ANDROID"));
-        // Test-package storage survives replacement of the separate target APK.
-        assertTrue(InstrumentationRegistry.getInstrumentation().getContext().getSharedPreferences("signed-update",Context.MODE_PRIVATE).edit().putString("snapshot",data).commit());
+        // Instrumentation runs under the target UID. Keep its checkpoint in a
+        // separate target preference file; losing that file also fails the test.
+        assertTrue(InstrumentationRegistry.getInstrumentation().getTargetContext().getSharedPreferences("signed-update",Context.MODE_PRIVATE).edit().putString("snapshot",data).commit());
     }
     @Test public void installedUpdatePreservesData() throws Exception {
         assumeTrue("after".equals(InstrumentationRegistry.getArguments().getString("upgradePhase")));
-        String before = InstrumentationRegistry.getInstrumentation().getContext().getSharedPreferences("signed-update",Context.MODE_PRIVATE).getString("snapshot",null);
+        String before = InstrumentationRegistry.getInstrumentation().getTargetContext().getSharedPreferences("signed-update",Context.MODE_PRIVATE).getString("snapshot",null);
         assertNotNull("Pre-update checkpoint exists",before);
         assertEquals("Updating the signed APK preserves all saved settings and records",before,readStoredData());
     }
