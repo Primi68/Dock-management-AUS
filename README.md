@@ -11,6 +11,7 @@
 - 설정 → 언어 설정에서 한국어 / English 선택. 입력한 기록과 구역 제목은 그대로 유지.
 - 자동 임시 저장, 이력, 텍스트 복사·내보내기, JSON 백업·복원.
 - 아이템 코드 최대 3개. 엑셀/WMS 자동 연동 없음.
+- 모든 Dock에서 코드 먼저, 번호 나중에 입력 가능. 번호 변경은 입력 내용을 유지하며, 내용 초기화는 확인 후 실행.
 
 [APK Releases](https://github.com/Primi68/Dock-management-AUS/releases) · [제품 명세](docs/SPEC.md) · [설치 안내](docs/INSTALL.md) · [개발 이어가기](docs/DEVELOPMENT.md) · [데이터 원칙](docs/PRIVACY.md) · [검증](docs/VERIFICATION.md)
 

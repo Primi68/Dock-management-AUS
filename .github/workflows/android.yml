@@ -49,12 +49,12 @@ jobs:
       - name: Name APK and checksum
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/Dock-Notes-0.3.2-preview.apk
+          cp app/build/outputs/apk/debug/app-debug.apk dist/Dock-Notes-0.3.3-preview.apk
           cd dist
           sha256sum *.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Dock-Notes-0.3.2-preview
+          name: Dock-Notes-0.3.3-preview
           path: dist/
       - uses: actions/upload-artifact@v4
         if: always()
@@ -99,12 +99,13 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: Dock-Notes-0.3.2-preview
+          name: Dock-Notes-0.3.3-preview
           path: dist
       - name: Publish private preview release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --prerelease --title "Dock Notes $GITHUB_REF_NAME — Android MVP" --notes "개인용 오프라인 Android MVP. 점검 작성 화면의 상단 안내 아래에 맨 아래로 이동하는 아래 화살표 추가. 화면·확인창·오류 안내·텍스트 변경 표시의 언어를 변경하며 직접 입력한 기록과 구역 제목은 유지합니다. English: Open Settings → Language settings, select English, then save. 설치 전 기존 앱에서 JSON 전체 백업을 저장하세요. Android 8 이상. 미리보기용 debug APK입니다. 실제 운영 데이터는 포함하지 않습니다. 설치 및 제한 사항은 저장소 docs/INSTALL.md를 확인해 주세요."
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --prerelease --title "Dock Notes $GITHUB_REF_NAME — Android MVP" --notes-file docs/releases/0.3.3.md
