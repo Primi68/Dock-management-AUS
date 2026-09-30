@@ -117,16 +117,16 @@ function refreshMark(n){
   el.querySelectorAll('[data-field]').forEach(input=>input.closest('label').classList.toggle('changed',d.fields.includes(input.dataset.field)));
   refreshCount();
 }
-function containerTools(n){return state.draft?.containerUndo?.[n]?`<button class="link" data-action="number-correction" data-dock="${n}">${t("번호만 정정한 경우 · 이전 내용 되살리기")}</button>`:'';}
+function containerTools(n){
+  const draft=state.draft,row=draft.rows[n-1],before=draft.baseline?.[n-1];
+  const changed=before?.container.trim()&&row.container.trim()&&C.normalized(before.container)!==C.normalized(row.container);
+  const correction=draft.corrections.includes(n);
+  return `${changed?`<button class="link" data-action="number-correction" data-dock="${n}">${correction?t("새 컨테이너로 표시"):t("번호만 정정")}</button>`:''}${draft.containerUndo?.[n]?`<button class="link" data-action="restore-container" data-dock="${n}">${t("이전 버전에서 비운 내용 복원")}</button>`:''}<button class="link danger" data-action="clear-contents" data-dock="${n}">${t("내용 초기화")}</button>`;
+}
 function finishContainer(n){
   const draft=state.draft;if(!draft)return;
   const old=draft.pendingContainers?.[n],row=draft.rows[n-1];if(!old)return;
-  if(old.container.trim() && row.container.trim() && C.normalized(old.container)!==C.normalized(row.container)){
-    draft.containerUndo=draft.containerUndo||{};draft.containerUndo[n]=old;
-    Object.assign(row,{codes:row.codes.map(()=>''),contents:'',status:'',note:''});
-    draft.corrections=draft.corrections.filter(x=>x!==n);
-  }
-  delete draft.pendingContainers[n];persist();
+  C.finishContainerEdit(draft,n);persist();
   const card=$('#dock-'+n);if(card){
     card.querySelectorAll('[data-field]').forEach(input=>{input.value=input.dataset.field==='codes'?(row.codes[Number(input.dataset.index)]||''):row[input.dataset.field];if(input.dataset.field==='codes'||input.dataset.field==='contents')input.disabled=row.status==='Ready to drop';});
     const tools=$('#container-tools-'+n);if(tools)tools.innerHTML=containerTools(n);refreshMark(n);
@@ -203,9 +203,19 @@ document.addEventListener('click',e=>{
   if(action==='discard'){discardDraft();return;}
   if(action==='number-correction'){
     remember();
-    const draft=state.draft,old=draft.containerUndo[n],number=draft.rows[n-1].container;
-    Object.assign(draft.rows[n-1],old,{container:number});delete draft.containerUndo[n];
-    if(!draft.corrections.includes(n))draft.corrections.push(n);persist();refreshRow(n);return;
+    const draft=state.draft;
+    if(draft.corrections.includes(n))draft.corrections=draft.corrections.filter(x=>x!==n);else draft.corrections.push(n);
+    persist();refreshRow(n);return;
+  }
+  if(action==='clear-contents'){
+    confirmAction(t("Dock {dock} 내용을 초기화할까요?",{dock:n}),t("컨테이너 번호는 유지하고 아이템 코드·내용물·상태·메모를 비웁니다. 이전 점검 기록은 유지됩니다."),t("내용 초기화"),()=>{remember();C.clearContainerContents(state.draft,n);persist();refreshRow(n);});return;
+  }
+  if(action==='restore-container'){
+    confirmAction(t("이전 버전에서 비운 내용을 복원할까요?"),t("번호는 유지하고 현재 코드·내용물·상태·메모를 자동으로 비우기 전 내용으로 바꿉니다. 번호는 정정으로 표시합니다."),t("복원"),()=>{
+      remember();const draft=state.draft,old=draft.containerUndo[n],number=draft.rows[n-1].container;
+      Object.assign(draft.rows[n-1],old,{container:number});delete draft.containerUndo[n];
+      if(!draft.corrections.includes(n))draft.corrections.push(n);persist();refreshRow(n);
+    });return;
   }
   if(action==='delete-check'){
     const r=current();if(state.draft||r.id!==state.records[state.records.length-1]?.id)return;

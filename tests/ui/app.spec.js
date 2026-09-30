@@ -87,7 +87,7 @@ test('complete field workflow, carry-forward, highlight, restart and departure',
   await expect(page.locator('#dock-1 .read-status')).toHaveClass(/changed/);await expect(page.locator('#dock-1')).not.toHaveClass(/whole/);
   await page.screenshot({path:'test-results/02-status-change.png',fullPage:false});
   await next(page,'11:30');await container(page,'DEMO-TRAILER-B');
-  await expect(page.locator('#dock-1')).toHaveClass(/whole/);await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('');await expect(page.locator('#dock-1 [data-field="status"]')).toHaveValue('');
+  await expect(page.locator('#dock-1')).toHaveClass(/whole/);await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('DEMO-ITEM-A');await expect(page.locator('#dock-1 [data-field="status"]')).toHaveValue('Empty');
   await page.locator('#dock-1 [data-field="codes"]').fill('DEMO-ITEM-B');await page.locator('#dock-1 [data-field="status"]').selectOption('Full');await page.getByRole('button',{name:'저장 · 점검 보기'}).click();
   await page.screenshot({path:'test-results/03-container-change.png',fullPage:false});
   await next(page,'13:30');await page.locator('#dock-1 [data-field="status"]').selectOption('Ready to drop');await page.locator('#confirm-action').click();
@@ -124,9 +124,72 @@ test('late number entry preserves observations and same-container typo correctio
   await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('DEMO-LATE-CODE');
   await expect(page.locator('#dock-1 [data-field="status"]')).toHaveValue('Full');
   await page.getByRole('button',{name:'저장 · 점검 보기'}).click();await next(page,'09:30');
-  await container(page,'DEMO-NUMBER-CORRECTED');await page.locator('#dock-1 [data-action="number-correction"]').click();
+  await container(page,'DEMO-NUMBER-CORRECTED');await page.locator('#dock-1 [data-field="note"]').fill('demo note after number edit');await page.locator('#dock-1 [data-action="number-correction"]').click();
   await expect(page.locator('#dock-1')).not.toHaveClass(/whole/);await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('DEMO-LATE-CODE');
+  await expect(page.locator('#dock-1 [data-field="note"]')).toHaveValue('demo note after number edit');
+  await page.reload();await expect(page.locator('#dock-1')).not.toHaveClass(/whole/);
+  await page.locator('#dock-1 [data-action="number-correction"]').click();await expect(page.locator('#dock-1')).toHaveClass(/whole/);
 });
+test('codes entered before a replacement number survive on every dock and after save and reload',async({page})=>{
+  test.setTimeout(60000);
+  await start(page);
+  await page.evaluate(()=>{state.draft.rows.forEach(row=>Object.assign(row,{container:'DEMO-OLD-'+row.dock,codes:['DEMO-OLD-CODE'],status:'Empty'}));persist();render();});
+  await page.getByRole('button',{name:'저장 · 점검 보기'}).click();await next(page,'09:30');
+  const previous=await page.evaluate(()=>JSON.parse(localStorage.getItem('dock-notes-v1')).records);
+  for(let n=1;n<=20;n++){
+    const dock=page.locator('#dock-'+n);
+    await dock.locator('[data-field="codes"]').fill('DEMO-NEW-CODE-'+n);
+    await dock.locator('[data-field="contents"]').fill('demo cargo');
+    await dock.locator('[data-field="status"]').selectOption('Full');
+    await dock.locator('[data-field="note"]').fill('demo note');
+    await dock.locator('[data-field="container"]').fill('DEMO-NEW-'+n);await dock.locator('[data-field="container"]').press('Tab');
+    for(const [field,value] of [['codes','DEMO-NEW-CODE-'+n],['contents','demo cargo'],['status','Full'],['note','demo note']])await expect(dock.locator('[data-field="'+field+'"]')).toHaveValue(value);
+    await expect(dock).toHaveClass(/whole/);
+  }
+  const draft=await page.evaluate(()=>JSON.parse(localStorage.getItem('dock-notes-v1')).draft);
+  await page.reload();expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dock-notes-v1')).draft.rows)).toEqual(draft.rows);
+  await page.getByRole('button',{name:'저장 · 점검 보기'}).click();
+  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('dock-notes-v1')));
+  expect(saved.records[0]).toEqual(previous[0]);expect(saved.records[1].rows).toEqual(draft.rows);expect(saved.records[1].baseline).toEqual(previous[0].rows);
+  await page.locator('[data-range="14-20"]').click();await page.screenshot({path:'test-results/09-wheel-numbers-preserve-codes.png'});
+});
+
+for(const [n,lang] of [[1,'ko'],[20,'en']])test(`explicit contents reset on Dock ${n} (${lang}) keeps the number and supports cancel, undo and redo`,async({page})=>{
+  await start(page);if(lang==='en')await language(page,'en');
+  const dock=page.locator('#dock-'+n);
+  await dock.locator('[data-field="container"]').fill('DEMO-KEEP-NUMBER');
+  await dock.locator('[data-field="codes"]').fill('DEMO-I1');await dock.locator('[data-action="add-code"]').click();await dock.locator('[data-field="codes"]').nth(1).fill('DEMO-I2');
+  await dock.locator('[data-field="contents"]').fill('demo cargo');await dock.locator('[data-field="status"]').selectOption('Full');await dock.locator('[data-field="note"]').fill('demo note');
+  const original=await page.evaluate(()=>JSON.parse(localStorage.getItem('dock-notes-v1')).draft.rows);
+  await dock.locator('[data-action="clear-contents"]').click();
+  await expect(page.locator('#dialog h2')).toHaveText(lang==='en'?`Clear contents for Dock ${n}?`:`Dock ${n} 내용을 초기화할까요?`);
+  await page.locator('#dialog [data-action="close"]').click();
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dock-notes-v1')).draft.rows)).toEqual(original);
+  await dock.locator('[data-action="clear-contents"]').click();await page.locator('#confirm-action').click();await page.reload();
+  await expect(dock.locator('[data-field="container"]')).toHaveValue('DEMO-KEEP-NUMBER');
+  for(const key of ['codes','contents','status','note'])await expect(dock.locator('[data-field="'+key+'"]')).toHaveValue('');
+  await page.locator('[data-action="undo"]').click();expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dock-notes-v1')).draft.rows)).toEqual(original);
+  await page.locator('[data-action="redo"]').click();await expect(dock.locator('[data-field="codes"]')).toHaveValue('');
+  await expect(dock.locator('[data-field="container"]')).toHaveValue('DEMO-KEEP-NUMBER');
+  if(lang==='en'){
+    await page.setViewportSize({width:320,height:700});await dock.scrollIntoViewIfNeeded();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+    await dock.locator('[data-action="clear-contents"]').click();await page.screenshot({path:'test-results/10-confirm-clear-contents.png'});
+  }
+});
+
+test('previous-version auto-clear recovery stays available without making number correction erase newer edits',async({page})=>{
+  await start(page);await container(page,'DEMO-OLD');await page.locator('#dock-1 [data-field="codes"]').fill('DEMO-RECOVER');
+  await page.getByRole('button',{name:'저장 · 점검 보기'}).click();await next(page,'09:30');
+  await page.evaluate(()=>{const r=state.draft;r.containerUndo={1:C.clone(r.rows[0])};Object.assign(r.rows[0],{container:'DEMO-NEW',codes:['']});persist();});
+  await page.reload();await page.locator('#dock-1 [data-field="note"]').fill('demo newer note');
+  await page.locator('#dock-1 [data-action="number-correction"]').click();await expect(page.locator('#dock-1 [data-field="note"]')).toHaveValue('demo newer note');
+  await page.locator('#dock-1 [data-action="restore-container"]').click();await page.locator('#dialog [data-action="close"]').click();await expect(page.locator('#dock-1 [data-field="note"]')).toHaveValue('demo newer note');
+  await page.locator('#dock-1 [data-action="restore-container"]').click();await page.locator('#confirm-action').click();
+  await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('DEMO-RECOVER');await expect(page.locator('#dock-1 [data-field="container"]')).toHaveValue('DEMO-NEW');
+  await page.locator('[data-action="undo"]').click();await expect(page.locator('#dock-1 [data-field="note"]')).toHaveValue('demo newer note');await expect(page.locator('#dock-1 [data-action="restore-container"]')).toBeVisible();
+});
+
 test('ready to drop cancellation preserves data; confirmation clears every field and survives reload',async({page})=>{
   await start(page);await container(page,'DEMO-A');
   await page.locator('#dock-1 [data-field="codes"]').fill('DEMO-I');
@@ -191,13 +254,13 @@ test('ready to drop can be undone and redone after restarting the draft',async({
   await expect(page.locator('#dock-1 [data-field="status"]')).toHaveValue('Ready to drop');
   await page.getByRole('button',{name:'되돌리기',exact:true}).click();await page.screenshot({path:'test-results/06-undo.png'});
 });
-test('container replacement is one undo step including dependent codes and status',async({page})=>{
+test('container replacement undo and redo keep codes and status',async({page})=>{
   await start(page);await container(page,'DEMO-A');await page.locator('#dock-1 [data-field="codes"]').fill('DEMO-I');await page.locator('#dock-1 [data-field="status"]').selectOption('Full');
   await page.getByRole('button',{name:'저장 · 점검 보기'}).click();await next(page,'09:30');
-  await container(page,'DEMO-B');await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('');
+  await container(page,'DEMO-B');await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('DEMO-I');
   await page.getByRole('button',{name:'되돌리기',exact:true}).click();
   await expect(page.locator('#dock-1 [data-field="container"]')).toHaveValue('DEMO-A');await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('DEMO-I');await expect(page.locator('#dock-1 [data-field="status"]')).toHaveValue('Full');
-  await page.getByRole('button',{name:'다시 실행',exact:true}).click();await expect(page.locator('#dock-1 [data-field="container"]')).toHaveValue('DEMO-B');await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('');
+  await page.getByRole('button',{name:'다시 실행',exact:true}).click();await expect(page.locator('#dock-1 [data-field="container"]')).toHaveValue('DEMO-B');await expect(page.locator('#dock-1 [data-field="codes"]')).toHaveValue('DEMO-I');
 });
 test('keyboard undo groups typing, supports redo, and saving resets editing history',async({page})=>{
   await start(page);const note=page.locator('#dock-1 [data-field="note"]');

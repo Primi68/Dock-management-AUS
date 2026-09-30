@@ -51,6 +51,45 @@ test('all twenty rows copy independently with clean highlighting',()=>{
   assert.deepEqual(C.diff(next.rows[8],next.baseline[8]).fields,[]);
   next.rows[8].codes[0]='DEMO-ITEM-B';assert.equal(r.rows[8].codes[0],'DEMO-ITEM-A');assert.equal(next.baseline[8].codes[0],'DEMO-ITEM-A');
 });
+test('number entry preserves observations on all docks, including a carried-forward number',()=>{
+  for(const previous of ['', 'DEMO-OLD']){
+    const s=C.initial(),r=C.newRecord(s,'2026-09-25','07:30');s.draft=r;
+    for(const row of r.rows){
+      Object.assign(row,{container:previous,codes:['DEMO-I1','DEMO-I2','DEMO-I3'],contents:'demo cargo',status:'Full',note:'demo note'});
+      r.pendingContainers=r.pendingContainers||{};r.pendingContainers[row.dock]=C.clone(row);
+      r.corrections.push(row.dock);row.container='DEMO-NEW';const expected=C.clone(row);
+      C.finishContainerEdit(r,row.dock);
+      assert.deepEqual(row,expected);assert.equal(r.corrections.includes(row.dock),false);
+      assert.equal(r.pendingContainers[row.dock],undefined);
+    }
+    assert.deepEqual(C.parseBackup(JSON.stringify(s)).draft.rows,r.rows);
+  }
+});
+test('pending number edits survive backup restore and do not erase observations on completion',()=>{
+  const s=C.initial(),r=C.newRecord(s,'2026-09-25','07:30');s.draft=r;
+  Object.assign(r.rows[13],{container:'DEMO-OLD',codes:['DEMO-WHEEL'],status:'Full',note:'demo note'});
+  r.pendingContainers={14:C.clone(r.rows[13])};r.rows[13].container='DEMO-NEW';
+  const restored=C.parseBackup(JSON.stringify(s)).draft;C.finishContainerEdit(restored,14);
+  assert.deepEqual(restored.rows,r.rows);
+  restored.corrections=[14];restored.pendingContainers={14:C.clone(restored.rows[13])};restored.rows[13].container=' demo-new ';
+  C.finishContainerEdit(restored,14);assert.deepEqual(restored.corrections,[14]);
+  restored.pendingContainers={14:C.clone(restored.rows[13])};restored.rows[13].container='';
+  C.finishContainerEdit(restored,14);assert.deepEqual(restored.corrections,[]);assert.deepEqual(restored.rows[13].codes,['DEMO-WHEEL']);
+});
+test('explicit contents reset keeps the number, history and baseline and is one undo step',()=>{
+  const s=C.initial(),previous=C.newRecord(s,'2026-09-25','07:30');s.records.push(previous);
+  Object.assign(previous.rows[19],{container:'DEMO-OLD',codes:['DEMO-I1'],status:'Empty'});
+  const r=C.newRecord(s,'2026-09-25','09:30');s.draft=r;
+  Object.assign(r.rows[19],{container:'DEMO-NEW',codes:['DEMO-I2','DEMO-I3'],contents:'demo cargo',status:'Full',note:'demo note'});
+  const before=C.clone(r.rows[19]),baseline=C.clone(r.baseline),records=C.clone(s.records);
+  C.rememberEdit(r);C.clearContainerContents(r,20);
+  assert.deepEqual(r.rows[19],{...C.blankRow(20),container:'DEMO-NEW'});
+  assert.deepEqual(r.baseline,baseline);assert.deepEqual(s.records,records);
+  assert.equal(C.diff(r.rows[19],r.baseline[19]).whole,true);
+  const restored=C.parseBackup(JSON.stringify(s)).draft;
+  assert.equal(C.travelEdit(restored),true);assert.deepEqual(restored.rows[19],before);
+  assert.equal(C.travelEdit(restored,true),true);assert.deepEqual(restored.rows[19],r.rows[19]);
+});
 test('new container is whole-row, status-only is field-only, reversion removes marks',()=>{
   const old={...C.blankRow(1),container:'DEMO-A',status:'Full'},row=C.clone(old);
   row.status='Empty';assert.deepEqual(C.diff(row,old),{whole:false,label:'항목 변경',fields:['status']});

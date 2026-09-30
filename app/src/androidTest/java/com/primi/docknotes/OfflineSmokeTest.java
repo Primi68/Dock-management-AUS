@@ -32,6 +32,20 @@ public class OfflineSmokeTest {
         }
         fail("Offline page did not load");
     }
+    @Test public void lateWheelNumberKeepsCodesAndResetCanBeUndoneAfterRecreation() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){let s=DockCore.initial();s.draft=DockCore.newRecord(s,'2026-09-25','07:30');Object.assign(s.draft.rows[13],{container:'DEMO-OLD',codes:['DEMO-WHEEL'],status:'Full',note:'demo note'});return DockNative.save(JSON.stringify(s));})()"));
+            scenario.recreate();waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){let input=document.querySelector('#dock-14 [data-field=container]');input.value='DEMO-NEW';input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('focusout',{bubbles:true}));let row=DockCore.parseBackup(DockNative.load()).draft.rows[13];return row.container==='DEMO-NEW' && row.codes[0]==='DEMO-WHEEL' && row.status==='Full' && row.note==='demo note';})()"));
+            scenario.recreate();waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"document.querySelector('#dock-14 [data-field=codes]').value==='DEMO-WHEEL'"));
+            assertEquals("true",evaluate(scenario,"(function(){document.querySelector('#dock-14 [data-action=clear-contents]').click();document.querySelector('#dialog [data-action=close]').click();return DockCore.parseBackup(DockNative.load()).draft.rows[13].codes[0]==='DEMO-WHEEL';})()"));
+            assertEquals("true",evaluate(scenario,"(function(){document.querySelector('#dock-14 [data-action=clear-contents]').click();document.querySelector('#confirm-action').click();let row=DockCore.parseBackup(DockNative.load()).draft.rows[13];return row.container==='DEMO-NEW' && row.codes[0]==='' && row.status==='';})()"));
+            scenario.recreate();waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){document.querySelector('[data-action=undo]').click();let row=DockCore.parseBackup(DockNative.load()).draft.rows[13];return row.container==='DEMO-NEW' && row.codes[0]==='DEMO-WHEEL' && row.status==='Full' && row.note==='demo note';})()"));
+        }
+    }
     @Test public void offlineBridgePersistsAndSurvivesActivityRecreation() throws Exception {
         assertEquals(PackageManager.PERMISSION_DENIED, InstrumentationRegistry.getInstrumentation().getTargetContext().checkCallingOrSelfPermission("android.permission.INTERNET"));
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
