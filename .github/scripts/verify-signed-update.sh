@@ -2,7 +2,7 @@
 set -euo pipefail
 ./gradlew --no-daemon -PdockTestBuildType=release :app:connectedReleaseAndroidTest
 bash .github/scripts/verify-signature.sh app/build/outputs/apk/release/app-release.apk
-bash .github/scripts/verify-signature.sh dist/Dock-Notes-0.3.4-preview.apk
+bash .github/scripts/verify-signature.sh dist/Dock-Notes-0.3.5-preview.apk
 adb install -r app/build/outputs/apk/release/app-release.apk
 adb install -r app/build/outputs/apk/androidTest/release/app-release-androidTest.apk
 instrument() {
@@ -14,5 +14,5 @@ instrument() {
 instrument 'com.primi.docknotes.OfflineSmokeTest#offlineBridgePersistsAndSurvivesActivityRecreation' seed
 instrument 'com.primi.docknotes.SignedUpdateTest#checkpointBeforeUpdate' before
 # This APK was independently built on the build job's fresh runner.
-adb install -r dist/Dock-Notes-0.3.4-preview.apk
+adb install -r dist/Dock-Notes-0.3.5-preview.apk
 instrument 'com.primi.docknotes.SignedUpdateTest#installedUpdatePreservesData' after

@@ -57,13 +57,13 @@ jobs:
       - name: Name APK and checksum
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk dist/Dock-Notes-0.3.4-preview.apk
+          cp app/build/outputs/apk/release/app-release.apk dist/Dock-Notes-0.3.5-preview.apk
           cp .github/release-certificate.sha256 dist/SIGNING-CERT-SHA256.txt
           cd dist
           sha256sum *.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Dock-Notes-0.3.4-preview
+          name: Dock-Notes-0.3.5-preview
           path: dist/
       - uses: actions/upload-artifact@v4
         if: always()
@@ -104,7 +104,7 @@ jobs:
         run: bash .github/scripts/prepare-signing.sh
       - uses: actions/download-artifact@v4
         with:
-          name: Dock-Notes-0.3.4-preview
+          name: Dock-Notes-0.3.5-preview
           path: dist
       - uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -132,10 +132,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: Dock-Notes-0.3.4-preview
+          name: Dock-Notes-0.3.5-preview
           path: dist
       - name: Publish private preview release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --prerelease --title "Dock Notes $GITHUB_REF_NAME — Android MVP" --notes-file docs/releases/0.3.4.md
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --prerelease --title "Dock Notes $GITHUB_REF_NAME — Android MVP" --notes-file docs/releases/0.3.5.md

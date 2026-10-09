@@ -32,6 +32,22 @@ public class OfflineSmokeTest {
         }
         fail("Offline page did not load");
     }
+    @Test public void readyDockInputDefaultsToFullAndUndoesWithItsStatusAfterRecreation() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){let s=DockCore.initial();let previous=DockCore.newRecord(s,'2026-10-08','07:30');previous.rows.forEach(row=>row.status='Ready to drop');previous.savedAt=new Date().toISOString();s.records.push(previous);s.draft=DockCore.newRecord(s,'2026-10-08','09:30');return DockNative.save(JSON.stringify(s));})()"));
+            scenario.recreate();waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){let input=document.querySelector('#dock-14 [data-field=codes]');if(input.disabled)return false;input.value='DEMO-WHEEL-FIRST';input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('focusout',{bubbles:true}));let s=DockCore.parseBackup(DockNative.load());return s.draft.rows[13].status==='Full' && s.draft.rows[13].container==='' && s.records[0].rows[13].status==='Ready to drop';})()"));
+            scenario.recreate();waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"document.querySelector('#dock-14 [data-field=codes]').value==='DEMO-WHEEL-FIRST' && document.querySelector('#dock-14 [data-field=status]').value==='Full'"));
+            assertEquals("true",evaluate(scenario,"(function(){document.querySelector('[data-action=undo]').click();let s=DockCore.parseBackup(DockNative.load());return s.draft.rows[13].status==='Ready to drop' && s.draft.rows[13].codes[0]==='' && !document.querySelector('#dock-14 [data-field=codes]').disabled;})()"));
+            scenario.recreate();waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){document.querySelector('[data-action=redo]').click();let row=DockCore.parseBackup(DockNative.load()).draft.rows[13];return row.status==='Full' && row.codes[0]==='DEMO-WHEEL-FIRST';})()"));
+            assertEquals("true",evaluate(scenario,"(function(){let input=document.querySelector('#dock-1 [data-field=container]');input.value='DEMO-NUMBER-FIRST';input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('focusout',{bubbles:true}));return DockCore.parseBackup(DockNative.load()).draft.rows[0].status==='Full';})()"));
+            scenario.recreate();waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){document.querySelector('[data-action=undo]').click();let s=DockCore.parseBackup(DockNative.load());return s.draft.rows[0].status==='Ready to drop' && s.draft.rows[0].container==='' && s.draft.rows[13].status==='Full' && s.records[0].rows.every(row=>row.status==='Ready to drop') && s.draft.baseline.every(row=>row.status==='Ready to drop');})()"));
+        }
+    }
     @Test public void lateWheelNumberKeepsCodesAndResetCanBeUndoneAfterRecreation() throws Exception {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             waitForPage(scenario);

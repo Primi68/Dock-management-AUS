@@ -91,7 +91,7 @@ test('complete field workflow, carry-forward, highlight, restart and departure',
   await page.locator('#dock-1 [data-field="codes"]').fill('DEMO-ITEM-B');await page.locator('#dock-1 [data-field="status"]').selectOption('Full');await page.getByRole('button',{name:'저장 · 점검 보기'}).click();
   await page.screenshot({path:'test-results/03-container-change.png',fullPage:false});
   await next(page,'13:30');await page.locator('#dock-1 [data-field="status"]').selectOption('Ready to drop');await page.locator('#confirm-action').click();
-  await expect(page.locator('#dock-1')).toHaveClass(/whole/);await expect(page.locator('#dock-1 [data-field="codes"]')).toBeDisabled();
+  await expect(page.locator('#dock-1')).toHaveClass(/whole/);await expect(page.locator('#dock-1 [data-field="codes"]')).toBeEnabled();
   await page.getByRole('button',{name:'저장 · 점검 보기'}).click();await expect(page.locator('#dock-1 .read-main')).toHaveText('—');
   expect(errors).toEqual([]);
 });
