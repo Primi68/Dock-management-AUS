@@ -50,9 +50,8 @@
     if (row.codes.map(normalized).filter(Boolean).join('|') !== before.codes.map(normalized).filter(Boolean).join('|')) fields.push('codes');
     return {whole:arrival || departure, label:arrival?'새 컨테이너':departure?'컨테이너 없음':'항목 변경', fields};
   }
-  // Start the upcoming slot 15 minutes early. Between windows keep the current
-  // slot (late checks); if it already exists, advance to the next unrecorded slot.
-  // 24:00 belongs to the preceding work date, even after midnight.
+  // Suggest the first scheduled check that has not passed or been recorded.
+  // 24:00 keeps its business date, but expires at midnight like any other slot.
   function suggest(now, settings, records) {
     const slots=[];
     const latest=records[records.length-1];
@@ -64,16 +63,12 @@
       for (const time of settings.times) {
         const at=new Date(day.getFullYear(),day.getMonth(),day.getDate(),0,0);
         at.setMinutes(minutes(time));
-        slots.push({date:dateKey(day),time,at:at.getTime(),open:at.getTime()-15*60000});
+        slots.push({date:dateKey(day),time,at:at.getTime()});
       }
     }
     slots.sort((a,b)=>a.at-b.at);
-    let candidates=slots.filter(s=>s.date===dateKey(now) || (s.time==='24:00' && now.getTime()>=s.open && now.getTime()<=s.at+30*60000));
-    const opened=candidates.filter(s=>s.open<=now.getTime());
-    let selected=opened.length?opened[opened.length-1]:candidates[0];
-    if (!selected) selected=slots.find(s=>s.at>=now.getTime());
     const exists=s=>records.some(r=>r.date===s.date && r.time===s.time);
-    if (selected && (exists(selected) || selected.at<=latestAt)) selected=slots.find(s=>s.at>Math.max(selected.at,latestAt) && !exists(s));
+    const selected=slots.find(s=>s.at>=now.getTime() && s.at>latestAt && !exists(s));
     if (!selected) throw new Error('점검 시간표를 확인해 주세요.');
     return {date:selected.date,time:selected.time};
   }

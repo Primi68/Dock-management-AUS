@@ -96,7 +96,7 @@
   "변경한 설정은 다음에 만드는 점검부터 적용됩니다.": "Schedule and group changes apply to new checks.",
   "시간마다 줄을 나눠 입력": "One time per line",
   "예: 07:30 · 마감 점검은 24:00": "Example: 07:30 · Closing check: 24:00",
-  "시작 15분 전부터 해당 점검 시간을 제안합니다.": "The next time is suggested from 15 minutes before the check.",
+  "현재 시각부터 가장 가까운 다음 점검 시간을 제안합니다.": "Suggests the next scheduled check at or after the current time.",
   "근무 요일": "Work days",
   "구역 제목과 Dock 범위": "Group names and Dock ranges",
   "제목 / 시작 번호 / 끝 번호": "Name / First Dock / Last Dock",

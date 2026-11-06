@@ -32,6 +32,12 @@ public class OfflineSmokeTest {
         }
         fail("Offline page did not load");
     }
+    @Test public void newChecksSkipPastScheduledTimesInTheOfflineWebView() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){let s=DockCore.defaults();return DockCore.suggest(new Date(2026,10,6,7,40),s,[]).time==='09:30' && DockCore.suggest(new Date(2026,10,6,11,40),s,[]).time==='13:30' && DockCore.suggest(new Date(2026,10,6,7,30),s,[]).time==='07:30';})()"));
+        }
+    }
     @Test public void readyDockInputDefaultsToFullAndUndoesWithItsStatusAfterRecreation() throws Exception {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             waitForPage(scenario);

@@ -24,17 +24,22 @@ test('English exports localize generated markers but never translate entered tex
   r.baseline=C.clone(r.rows);r.rows[0].status='Empty';
   assert.match(C.text(r,'en'),/\[Changed: Status\]/);
 });
-test('15-minute early checks select the intended scheduled time',()=>{
+test('new checks select the upcoming time, including immediately after a missed check',()=>{
   const s=C.defaults();
-  for(const [now,time] of [['2026-09-25T07:15:00','07:30'],['2026-09-25T09:14:59','07:30'],['2026-09-25T09:15:00','09:30'],['2026-09-25T11:40:00','11:30'],['2026-09-25T13:15:00','13:30']])assert.equal(C.suggest(date(now),s,[]).time,time);
+  for(const [now,time] of [['2026-09-25T07:15:00','07:30'],['2026-09-25T07:30:00','07:30'],['2026-09-25T07:30:00.001','09:30'],['2026-09-25T07:40:00','09:30'],['2026-09-25T09:14:59','09:30'],['2026-09-25T09:15:00','09:30'],['2026-09-25T11:40:00','13:30'],['2026-09-25T13:15:00','13:30']])assert.equal(C.suggest(date(now),s,[]).time,time);
 });
 test('Friday last check advances to Monday and skips unworked days',()=>{
   const r=[{date:'2026-09-25',time:'15:30'}];
-  for(const now of ['2026-09-25T15:35:00','2026-09-26T08:00:00','2026-09-28T07:15:00'])assert.deepEqual(C.suggest(date(now),C.defaults(),r),{date:'2026-09-28',time:'07:30'});
+  for(const records of [[],r])for(const now of ['2026-09-25T15:35:00','2026-09-26T08:00:00','2026-09-28T07:15:00'])assert.deepEqual(C.suggest(date(now),C.defaults(),records),{date:'2026-09-28',time:'07:30'});
 });
 test('midnight belongs to preceding business day when enabled',()=>{
   const s=C.defaults();s.times.push('24:00');
-  assert.deepEqual(C.suggest(date('2026-09-26T00:05:00'),s,[]),{date:'2026-09-25',time:'24:00'});
+  for(const now of ['2026-09-25T23:40:00','2026-09-26T00:00:00'])assert.deepEqual(C.suggest(date(now),s,[]),{date:'2026-09-25',time:'24:00'});
+  assert.deepEqual(C.suggest(date('2026-09-26T00:05:00'),s,[]),{date:'2026-09-28',time:'07:30'});
+});
+test('custom unsorted schedules use the next time in the device local timezone',()=>{
+  const s=C.defaults();s.times=['16:45','06:00','10:10'];
+  assert.deepEqual(C.suggest(date('2026-09-25T06:01:00'),s,[]),{date:'2026-09-25',time:'10:10'});
 });
 test('a future saved check still advances instead of proposing an older record',()=>{
   assert.deepEqual(C.suggest(date('2026-09-25T15:35:00'),C.defaults(),[{date:'2026-09-28',time:'07:30'}]),{date:'2026-09-28',time:'09:30'});
