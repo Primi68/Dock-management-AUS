@@ -31,8 +31,7 @@ test('English setting persists, restores from backup and preserves user text, dr
 });
 
 test('English schedule, validation, departure confirmation, exports and settings cancellation',async({page})=>{
-  await page.goto('/');await language(page,'en');await expect(page.getByRole('button',{name:'Start first check →'})).toBeVisible();
-  await page.getByRole('button',{name:'Start first check →'}).click();
+  await page.goto('/');await language(page,'en');await expect(page.getByRole('button',{name:'Save · View check'})).toBeVisible();
   await page.getByRole('button',{name:'Change check date / time'}).click();
   await page.locator('#new-date').fill('');await page.getByRole('button',{name:'Apply time'}).click();
   await expect(page.locator('#new-error')).toHaveText('Check the date and inspection time.');
@@ -60,7 +59,7 @@ test('English schedule, validation, departure confirmation, exports and settings
   await page.setViewportSize({width:320,height:700});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });
 async function start(page){
-  await page.goto('/');await page.getByRole('button',{name:'첫 점검 만들기'}).click();
+  await page.goto('/');
   await expect(page.locator('.dock')).toHaveCount(20);
   await page.getByRole('button',{name:'날짜·점검 시간 수정'}).click();
   await page.locator('#new-date').fill('2026-09-25');await page.locator('#new-time').selectOption('07:30');
@@ -111,8 +110,8 @@ test('editable settings, header isolation, backups and history',async({page})=>{
   const before=await page.evaluate(()=>localStorage.getItem('dock-notes-v1'));await page.evaluate(()=>window.receiveBackup('{broken'));expect(await page.evaluate(()=>localStorage.getItem('dock-notes-v1'))).toBe(before);
   await page.locator('#menu').click();await page.getByRole('button',{name:'지난 점검 기록'}).click();await expect(page.locator('.history-item')).toHaveCount(1);
 });
-test('empty state and no horizontal overflow on narrow phones',async({page})=>{
-  await page.goto('/');await page.screenshot({path:'test-results/01-welcome.png'});await start(page);
+test('first launch opens an editable check with no horizontal overflow on narrow phones',async({page})=>{
+  await page.goto('/');await expect(page.locator('.dock')).toHaveCount(20);await start(page);
   await page.screenshot({path:'test-results/04-editing.png'});
   await page.setViewportSize({width:320,height:700});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });

@@ -38,6 +38,14 @@ public class OfflineSmokeTest {
             assertEquals("true",evaluate(scenario,"(function(){let s=DockCore.defaults();return DockCore.suggest(new Date(2026,10,6,7,40),s,[]).time==='09:30' && DockCore.suggest(new Date(2026,10,6,11,40),s,[]).time==='13:30' && DockCore.suggest(new Date(2026,10,6,7,30),s,[]).time==='07:30';})()"));
         }
     }
+    @Test public void launchOpensTheUpcomingCheckPageWithoutAnExtraTap() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){let s=DockCore.initial(),next=new Date(Date.now()+10*60000);s.settings.days=[0,1,2,3,4,5,6];s.settings.times=[String(next.getHours()).padStart(2,'0')+':'+String(next.getMinutes()).padStart(2,'0')];return DockNative.save(JSON.stringify(s));})()"));
+            scenario.recreate();waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){let s=DockCore.parseBackup(DockNative.load());return !!s.draft && s.draft.time===s.settings.times[0] && document.querySelector('.check-intro h1').textContent===s.draft.time && document.querySelectorAll('.dock').length===20;})()"));
+        }
+    }
     @Test public void readyDockInputDefaultsToFullAndUndoesWithItsStatusAfterRecreation() throws Exception {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             waitForPage(scenario);

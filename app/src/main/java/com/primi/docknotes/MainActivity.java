@@ -61,6 +61,11 @@ public class MainActivity extends Activity {
         web.loadUrl("https://app.docknotes.local/index.html");
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        if (web != null) web.evaluateJavascript("if(window.openScheduledPage)window.openScheduledPage()", null);
+    }
+
     private String read(InputStream stream) throws IOException {
         try (InputStream input = stream; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[8192]; int count;

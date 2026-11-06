@@ -12,6 +12,7 @@ function updateUndoButtons(){
   if(redo)redo.disabled=!state.draft?.redoHistory?.length;
 }
 function remember(group=null){
+  delete state.draft.automatic;
   const key=group?state.draft.id+':'+group:null;
   C.rememberEdit(state.draft,!!key&&key===undoGroup);undoGroup=key;updateUndoButtons();
 }
@@ -47,15 +48,33 @@ function download(name,mime,content){
   const url=URL.createObjectURL(new Blob([content],{type:mime}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 function copyRecord(){const text=C.text(current(),state.settings.language);if(native)native.copy(text);else navigator.clipboard.writeText(text).then(()=>toast(t("점검 기록을 복사했습니다"))).catch(()=>download('dock-check.txt','text/plain',text));}
-function openNew(){
+function openNew(automatic=false){
   if(state.draft){editing=true;screen='record';onlyChanged=false;render();return;}
   try{
     const slot=C.suggest(new Date(),state.settings,state.records);
     state.draft=C.newRecord(state,slot.date,slot.time);
+    if(automatic)state.draft.automatic=true;
     if(!persist()){state.draft=null;return;}
     editing=true;onlyChanged=false;screen='record';render();window.scrollTo(0,0);
   }catch(e){toast(t(e.message));}
 }
+function openScheduledPage(){
+  if(screen!=='record'||$('#dialog').open)return;
+  try{
+    const slot=C.suggest(new Date(),state.settings,[]);
+    const draft=state.draft;
+    if(draft){
+      const untouched=draft.automatic===true&&!draft.editOf&&!draft.undoHistory?.length&&!draft.redoHistory?.length&&!draft.corrections.length&&JSON.stringify(draft.rows)===JSON.stringify(draft.baseline||Array.from({length:20},(_,i)=>C.blankRow(i+1)));
+      if(!untouched||(draft.date===slot.date&&draft.time===slot.time))return;
+      state.draft=null;
+      if(!persist()){state.draft=draft;return;}
+    }
+    const saved=state.records.find(r=>r.date===slot.date&&r.time===slot.time);
+    if(saved){selected=saved.id;editing=false;onlyChanged=false;render();return;}
+    openNew(true);
+  }catch(e){toast(t(e.message));}
+}
+window.openScheduledPage=openScheduledPage;
 function editSchedule(){
   if(state.draft.editOf){toast(t("저장된 점검은 원래 날짜·시간을 유지합니다. 잘못 만든 최신 점검은 삭제할 수 있습니다."));return;}
   const r=state.draft,times=[...new Set([...state.settings.times,r.time])].sort((a,b)=>C.minutes(a)-C.minutes(b));
@@ -286,3 +305,5 @@ try{const raw=native?native.load():localStorage.getItem('dock-notes-v1');brokenR
 catch(e){state=C.initial();screen='broken';}
 if(state.draft)Object.keys(state.draft.pendingContainers||{}).forEach(n=>finishContainer(Number(n)));
 render();
+if(screen==='record')openScheduledPage();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)openScheduledPage();});
