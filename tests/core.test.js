@@ -95,6 +95,21 @@ test('explicit contents reset keeps the number, history and baseline and is one 
   assert.equal(C.travelEdit(restored),true);assert.deepEqual(restored.rows[19],before);
   assert.equal(C.travelEdit(restored,true),true);assert.deepEqual(restored.rows[19],r.rows[19]);
 });
+test('clearing an entire check preserves its baseline and records and undoes as one operation',()=>{
+  const s=C.initial(),previous=C.newRecord(s,'2026-09-25','07:30');s.records.push(previous);
+  previous.rows.forEach(row=>Object.assign(row,{container:'DEMO-OLD-'+row.dock,codes:['DEMO-A','DEMO-B','DEMO-C'],contents:'DEMO-CARGO',status:'Full',note:'DEMO-NOTE'}));
+  s.draft=C.newRecord(s,'2026-09-25','09:30');const r=s.draft;
+  r.corrections=[1,20];r.pendingContainers={1:C.clone(r.rows[0])};r.containerUndo={20:C.clone(r.rows[19])};
+  const before=C.clone(r),records=C.clone(s.records),settings=C.clone(s.settings);
+  C.rememberEdit(r);C.clearCheck(r);
+  assert.deepEqual(r.rows,Array.from({length:20},(_,i)=>C.blankRow(i+1)));
+  assert.deepEqual(r.corrections,[]);assert.deepEqual(r.pendingContainers,{});assert.deepEqual(r.containerUndo,{});
+  for(const key of ['id','date','time','groups','baseline'])assert.deepEqual(r[key],before[key]);
+  assert.deepEqual(s.records,records);assert.deepEqual(s.settings,settings);
+  const restored=C.parseBackup(JSON.stringify(s)).draft;
+  assert.equal(C.travelEdit(restored),true);assert.deepEqual(C.editSnapshot(restored),C.editSnapshot(before));
+  assert.equal(C.travelEdit(restored,true),true);assert.deepEqual(restored.rows,r.rows);
+});
 test('new container is whole-row, status-only is field-only, reversion removes marks',()=>{
   const old={...C.blankRow(1),container:'DEMO-A',status:'Full'},row=C.clone(old);
   row.status='Empty';assert.deepEqual(C.diff(row,old),{whole:false,label:'항목 변경',fields:['status']});

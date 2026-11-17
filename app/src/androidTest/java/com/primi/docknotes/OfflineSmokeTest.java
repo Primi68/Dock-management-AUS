@@ -32,6 +32,19 @@ public class OfflineSmokeTest {
         }
         fail("Offline page did not load");
     }
+    @Test public void clearEntireCheckPersistsAndUndoesAfterRecreation() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){let s=DockCore.initial(),r=DockCore.newRecord(s,'2026-11-17','07:30');r.rows.forEach(row=>Object.assign(row,{container:'DEMO-'+row.dock,codes:['DEMO-CODE'],contents:'DEMO-CARGO',status:'Full',note:'DEMO-NOTE'}));r.savedAt=new Date().toISOString();s.records.push(r);s.draft=DockCore.newRecord(s,'2026-11-17','09:30');return DockNative.save(JSON.stringify(s));})()"));
+            scenario.recreate();waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){document.querySelector('[data-action=clear-check]').click();return document.querySelector('#dialog').open && document.querySelector('#dock-20 [data-field=container]').value==='DEMO-20';})()"));
+            assertEquals("true",evaluate(scenario,"(function(){document.querySelector('#confirm-action').click();let s=DockCore.parseBackup(DockNative.load());return s.draft.rows.every(r=>!r.container&&!r.status&&!r.note&&!r.contents&&r.codes[0]==='') && s.records[0].rows[19].container==='DEMO-20' && s.draft.baseline[19].container==='DEMO-20';})()"));
+            scenario.recreate();waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){document.querySelector('[data-action=undo]').click();return DockCore.parseBackup(DockNative.load()).draft.rows.every(r=>r.container==='DEMO-'+r.dock && r.codes[0]==='DEMO-CODE' && r.status==='Full');})()"));
+            scenario.recreate();waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){document.querySelector('[data-action=redo]').click();return DockCore.parseBackup(DockNative.load()).draft.rows.every(r=>!r.container&&!r.status);})()"));
+        }
+    }
     @Test public void newChecksSkipPastScheduledTimesInTheOfflineWebView() throws Exception {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             waitForPage(scenario);

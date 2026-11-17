@@ -41,6 +41,12 @@
     if(r.pendingContainers)delete r.pendingContainers[n];
     if(r.containerUndo)delete r.containerUndo[n];
   }
+  function clearCheck(r){
+    r.rows=Array.from({length:20},(_,i)=>blankRow(i+1));
+    r.corrections=[];
+    r.pendingContainers={};
+    r.containerUndo={};
+  }
   function diff(row, before, correction) {
     if (!before) before = blankRow(row.dock);
     const containerChanged = normalized(row.container) !== normalized(before.container);
@@ -168,5 +174,5 @@
     }
     return s;
   }
-  return {clone,dateKey,validDate,validTime,minutes,statuses,blankRow,defaults,initial,normalized,editSnapshot,rememberEdit,travelEdit,finishContainerEdit,clearContainerContents,diff,suggest,newRecord,text,validateSettings,parseBackup};
+  return {clone,dateKey,validDate,validTime,minutes,statuses,blankRow,defaults,initial,normalized,editSnapshot,rememberEdit,travelEdit,finishContainerEdit,clearContainerContents,clearCheck,diff,suggest,newRecord,text,validateSettings,parseBackup};
 });

@@ -6,6 +6,10 @@
   'use strict';
   // Keys are the original Korean interface messages. Never translate user data.
   const english = {
+  "현재 점검 전체 초기화": "Clear entire check",
+  "Dock 1~20을 모두 비울까요?": "Clear all Dock 1–20 fields?",
+  "현재 점검의 컨테이너 번호·아이템 코드·내용물·상태·메모를 모두 비웁니다. 날짜·시간·설정·이전 기록은 유지됩니다. 되돌리기로 복구할 수 있습니다.": "Clears container numbers, item codes, contents, statuses and notes in this check. Keeps its date and time, settings and saved records. You can restore everything with Undo.",
+  "전체 비우기": "Clear all fields",
   "맨 아래로": "Go to bottom",
   "설정": "Settings",
   "언어 설정": "Language settings",
