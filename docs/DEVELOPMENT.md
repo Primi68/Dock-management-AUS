@@ -36,3 +36,6 @@ GitHub Actions 저장소 비밀 설정 `DOCK_RELEASE_KEYSTORE_BASE64`와 `DOCK_R
 회사 또는 다른 GitHub 저장소로 옮길 때도 같은 키·비밀번호를 새 저장소의 비밀 설정으로 복사하고 applicationId를 유지합니다. GitHub 비밀 설정 값은 다시 읽는 용도의 백업이 아니므로 원본 키와 비밀번호를 별도로 안전하게 보관해야 합니다. 이 PC의 비밀번호 로컬 사본은 Windows DPAPI로 보호되어 다른 PC에서 파일만 복사해서는 해독할 수 없습니다. PC를 교체하기 전에 같은 Windows 계정에서 복구해 비밀번호 관리자 등에 옮기고, 암호화된 키 파일도 별도 보관하세요. 키를 잃어버렸다고 자동 재생성하지 않습니다.
 
 기술 근거: [Android 앱 서명](https://developer.android.com/studio/publish/app-signing), [GitHub Actions 비밀 설정](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets).
+
+
+CI 실행기는 Ubuntu 24.04로 고정합니다. `ubuntu-latest`의 26.04 전환 이후 고정된 Playwright 1.56.1이 의존성 설치를 지원하지 않아, 지원되는 실행기에서 동일한 브라우저·Android 도구 조합을 유지합니다.
