@@ -174,7 +174,7 @@ function saveCheck(){
   selected=r.id;editing=false;onlyChanged=false;render();window.scrollTo(0,0);toast(t("저장했습니다."));
 }
 function menu(){
-  modal(`<h2>Dock Notes</h2><div class="menu-list"><button data-action="latest">${t("최신 점검")}${state.draft?` / ${t("작성 중")}`:''}</button><button data-action="history">${t("지난 점검 기록")}</button><button data-action="settings">${t("설정")}</button><button data-action="backup">${t("전체 기록 백업 (JSON)")}</button><button data-action="restore">${t("백업 복원")}</button><button data-action="all-text">${t("모든 기록 텍스트 저장")}</button><button data-action="close">${t("닫기")}</button></div><p class="smallprint">v0.3.7 · ${t("오프라인 개인 기록장")}<br>${t("실제 기록은 GitHub에 전송하지 않습니다.")}<br>${t("앱 삭제 전에는 전체 백업을 저장해 주세요.")}</p>`);
+  modal(`<h2>Dock Notes</h2><div class="menu-list"><button data-action="latest">${t("최신 점검")}${state.draft?` / ${t("작성 중")}`:''}</button><button data-action="history">${t("지난 점검 기록")}</button><button data-action="settings">${t("설정")}</button><button data-action="backup">${t("전체 기록 백업 (JSON)")}</button><button data-action="restore">${t("백업 복원")}</button><button data-action="all-text">${t("모든 기록 텍스트 저장")}</button><button data-action="close">${t("닫기")}</button></div><p class="smallprint">v0.3.8 · ${t("오프라인 개인 기록장")}<br>${t("실제 기록은 GitHub에 전송하지 않습니다.")}<br>${t("앱 삭제 전에는 전체 백업을 저장해 주세요.")}</p>`);
 }
 function renderHistory(){
   $('#app').innerHTML=`<div class="eyebrow">HISTORY</div><h1>${t("지난 점검")}</h1><p class="muted">${t('{count}개 기록 · 이전 점검과의 변경 표시를 보존합니다.',{count:state.records.length})}</p><button data-action="latest">← ${t("최신 점검")}</button>${state.records.slice().reverse().map(r=>`<button class="history-item" data-action="record" data-id="${esc(r.id)}">${esc(r.date)} · ${esc(r.time)}<small>${t('{count}곳 변경 · 기록 보기',{count:r.rows.filter(row=>change(r,row).fields.length).length})}</small></button>`).join('')||`<p class="muted">${t("저장한 점검이 없습니다.")}</p>`}`;
@@ -269,6 +269,33 @@ document.addEventListener('click',e=>{
   if(action==='raw-backup'){download('dock-recovery.json','application/json',brokenRaw||'');return;}
   if(action==='all-text'){download('dock-history.txt','text/plain',state.records.map(r=>C.text(r,state.settings.language)).join('\n\n────────────────\n\n'));return;}
   if(action==='restore'){closeDialog();if(native)native.importFile();else $('#import-file').click();}
+});
+// Select only when entering a different observation field. A second tap keeps
+// the browser's native caret/selection behavior; scrolling is never intercepted.
+let fieldPointer=null;
+function observationInput(el){
+  return editing&&screen==='record'&&!$('#dialog').open&&el instanceof HTMLInputElement&&
+    ['container','codes','contents','note'].includes(el.dataset.field)&&!el.disabled;
+}
+document.addEventListener('pointerdown',e=>{
+  // Android keeps a tapped select-all range unless it is collapsed before the
+  // native hit test. Let that hit test place the caret at the second tap.
+  if(e.isPrimary!==false&&e.button===0&&observationInput(e.target)&&document.activeElement===e.target&&
+      e.target.selectionStart===0&&e.target.selectionEnd===e.target.value.length)
+    e.target.setSelectionRange(e.target.selectionEnd,e.target.selectionEnd);
+  fieldPointer=e.isPrimary!==false&&e.button===0&&observationInput(e.target)&&document.activeElement!==e.target?
+    {el:e.target,x:e.clientX,y:e.clientY}:null;
+});
+document.addEventListener('pointermove',e=>{
+  if(fieldPointer&&Math.hypot(e.clientX-fieldPointer.x,e.clientY-fieldPointer.y)>10)fieldPointer=null;
+});
+document.addEventListener('pointercancel',()=>{fieldPointer=null;});
+document.addEventListener('focusin',e=>{
+  if(observationInput(e.target)&&fieldPointer?.el!==e.target)e.target.select();
+});
+document.addEventListener('click',e=>{
+  const first=fieldPointer?.el===e.target;fieldPointer=null;
+  if(first&&observationInput(e.target)&&document.activeElement===e.target)e.target.select();
 });
 document.addEventListener('input',e=>{
   const el=e.target,key=el.dataset.field;if(!key||key==='status'||!editing)return;

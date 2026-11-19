@@ -2,12 +2,15 @@ package com.primi.docknotes;
 
 import android.content.pm.PackageManager;
 import android.view.ViewGroup;
+import android.view.MotionEvent;
+import android.os.SystemClock;
 import android.webkit.WebView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.json.JSONArray;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -31,6 +34,33 @@ public class OfflineSmokeTest {
             Thread.sleep(250);
         }
         fail("Offline page did not load");
+    }
+    private void tapFirstContainer(ActivityScenario<MainActivity> scenario) throws Exception {
+        JSONArray point = new JSONArray(evaluate(scenario,"(function(){let e=document.querySelector('#dock-1 [data-field=container]');e.scrollIntoView({block:'center',behavior:'instant'});let r=e.getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2,innerWidth];})()"));
+        float cssX=(float)point.getDouble(0),cssY=(float)point.getDouble(1),cssWidth=(float)point.getDouble(2);
+        scenario.onActivity(activity -> {
+            WebView web=(WebView)((ViewGroup)activity.findViewById(android.R.id.content)).getChildAt(0);
+            float scale=web.getWidth()/cssWidth;
+            long time=SystemClock.uptimeMillis();
+            MotionEvent down=MotionEvent.obtain(time,time,MotionEvent.ACTION_DOWN,cssX*scale,cssY*scale,0);
+            MotionEvent up=MotionEvent.obtain(time,time+1,MotionEvent.ACTION_UP,cssX*scale,cssY*scale,0);
+            web.dispatchTouchEvent(down);web.dispatchTouchEvent(up);down.recycle();up.recycle();
+        });
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+    }
+    @Test public void firstTouchSelectsAllAndSecondTouchAllowsPartialEditingWithoutChangingData() throws Exception {
+        try (ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
+            waitForPage(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){let s=DockCore.initial();s.draft=DockCore.newRecord(s,'2026-11-19','09:30');s.draft.rows[0].container='DEMO-NUMBER';return DockNative.save(JSON.stringify(s));})()"));
+            scenario.recreate();waitForPage(scenario);tapFirstContainer(scenario);
+            for(int i=0;i<30;i++){
+                if("true".equals(evaluate(scenario,"(function(){let e=document.querySelector('#dock-1 [data-field=container]');return document.activeElement===e&&e.selectionStart===0&&e.selectionEnd===e.value.length;})()")))break;
+                Thread.sleep(100);
+            }
+            assertEquals("true",evaluate(scenario,"(function(){let e=document.querySelector('#dock-1 [data-field=container]');return e.selectionStart===0&&e.selectionEnd===e.value.length;})()"));
+            Thread.sleep(600);tapFirstContainer(scenario);
+            assertEquals("true",evaluate(scenario,"(function(){let e=document.querySelector('#dock-1 [data-field=container]'),s=DockCore.parseBackup(DockNative.load());return e.selectionStart===e.selectionEnd&&s.draft.rows[0].container==='DEMO-NUMBER'&&!s.draft.undoHistory?.length;})()"));
+        }
     }
     @Test public void clearEntireCheckPersistsAndUndoesAfterRecreation() throws Exception {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
