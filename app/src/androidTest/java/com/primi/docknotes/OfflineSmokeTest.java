@@ -40,10 +40,12 @@ public class OfflineSmokeTest {
         float cssX=(float)point.getDouble(0),cssY=(float)point.getDouble(1),cssWidth=(float)point.getDouble(2);
         scenario.onActivity(activity -> {
             WebView web=(WebView)((ViewGroup)activity.findViewById(android.R.id.content)).getChildAt(0);
-            float scale=web.getWidth()/cssWidth;
+            // DOM coordinates start inside the WebView's system-inset padding.
+            float scale=(web.getWidth()-web.getPaddingLeft()-web.getPaddingRight())/cssWidth;
+            float x=web.getPaddingLeft()+cssX*scale,y=web.getPaddingTop()+cssY*scale;
             long time=SystemClock.uptimeMillis();
-            MotionEvent down=MotionEvent.obtain(time,time,MotionEvent.ACTION_DOWN,cssX*scale,cssY*scale,0);
-            MotionEvent up=MotionEvent.obtain(time,time+1,MotionEvent.ACTION_UP,cssX*scale,cssY*scale,0);
+            MotionEvent down=MotionEvent.obtain(time,time,MotionEvent.ACTION_DOWN,x,y,0);
+            MotionEvent up=MotionEvent.obtain(time,time+1,MotionEvent.ACTION_UP,x,y,0);
             web.dispatchTouchEvent(down);web.dispatchTouchEvent(up);down.recycle();up.recycle();
         });
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
@@ -59,7 +61,8 @@ public class OfflineSmokeTest {
             }
             assertEquals("true",evaluate(scenario,"(function(){let e=document.querySelector('#dock-1 [data-field=container]');return e.selectionStart===0&&e.selectionEnd===e.value.length;})()"));
             Thread.sleep(600);tapFirstContainer(scenario);
-            assertEquals("true",evaluate(scenario,"(function(){let e=document.querySelector('#dock-1 [data-field=container]'),s=DockCore.parseBackup(DockNative.load());return e.selectionStart===e.selectionEnd&&s.draft.rows[0].container==='DEMO-NUMBER'&&!s.draft.undoHistory?.length;})()"));
+            String selection=evaluate(scenario,"(function(){let e=document.querySelector('#dock-1 [data-field=container]');return {start:e.selectionStart,end:e.selectionEnd,focused:document.activeElement===e};})()");
+            assertEquals("Second tap selection: "+selection,"true",evaluate(scenario,"(function(){let e=document.querySelector('#dock-1 [data-field=container]'),s=DockCore.parseBackup(DockNative.load());return document.activeElement===e&&e.selectionStart===e.selectionEnd&&s.draft.rows[0].container==='DEMO-NUMBER'&&!s.draft.undoHistory?.length;})()"));
         }
     }
     @Test public void clearEntireCheckPersistsAndUndoesAfterRecreation() throws Exception {
